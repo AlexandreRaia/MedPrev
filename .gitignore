@@ -1,0 +1,28 @@
+# Configuração local e segredos
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.tmp/
+.run/
+.ruff_cache/
+coverage.xml
+htmlcov/
+
+# Django
+backend/db.sqlite3
+backend/staticfiles/
+backend/media/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Editores e sistema operacional
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
