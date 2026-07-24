@@ -3,6 +3,9 @@ from typing import Literal
 from django.conf import settings
 from ninja import NinjaAPI, Schema
 
+from apps.contas.admin_api import router as administracao_router
+from apps.contas.api import router as contas_router
+
 
 class HealthResponse(Schema):
     status: Literal["ok"]
@@ -14,6 +17,8 @@ api = NinjaAPI(
     version="1.0.0",
     docs_url="/docs" if settings.DEBUG else None,
 )
+api.add_router("/auth", contas_router)
+api.add_router("/administracao", administracao_router)
 
 
 @api.get(

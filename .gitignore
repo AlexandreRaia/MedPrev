@@ -1,5 +1,6 @@
 # Configuração local e segredos
 .env
+*.dump
 
 # Python
 __pycache__/
@@ -20,6 +21,9 @@ backend/media/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+
+# Protótipo de telas (não versionado)
+mediprev-telas/
 
 # Editores e sistema operacional
 .idea/

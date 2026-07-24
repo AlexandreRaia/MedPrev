@@ -4,4 +4,4 @@ from django.apps import AppConfig
 class LegadoConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.legado"
-    verbose_name = "Integração com o SisMed"
+    verbose_name = "Dados importados de desenvolvimento"

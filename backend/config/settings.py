@@ -104,27 +104,6 @@ elif database_engine in {"postgres", "postgresql"}:
 else:
     raise ImproperlyConfigured("DATABASE_ENGINE deve ser 'sqlite', 'postgres' ou 'postgresql'.")
 
-sismed_database_engine = os.getenv("SISMED_DATABASE_ENGINE")
-sismed_database_name = os.getenv("SISMED_DATABASE_NAME")
-
-if bool(sismed_database_engine) != bool(sismed_database_name):
-    raise ImproperlyConfigured(
-        "SISMED_DATABASE_ENGINE e SISMED_DATABASE_NAME devem ser definidos juntos."
-    )
-
-if sismed_database_engine and sismed_database_name:
-    DATABASES["sismed"] = {
-        "ENGINE": sismed_database_engine,
-        "NAME": sismed_database_name,
-        "USER": os.getenv("SISMED_DATABASE_USER", ""),
-        "PASSWORD": os.getenv("SISMED_DATABASE_PASSWORD", ""),
-        "HOST": os.getenv("SISMED_DATABASE_HOST", ""),
-        "PORT": os.getenv("SISMED_DATABASE_PORT", ""),
-        "CONN_MAX_AGE": 0,
-    }
-
-DATABASE_ROUTERS = ["apps.legado.database_router.SisMedDatabaseRouter"]
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": ("django.contrib.auth.password_validation.UserAttributeSimilarityValidator"),

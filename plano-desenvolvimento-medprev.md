@@ -3,6 +3,11 @@
 **Status:** plano-base para validação  
 **Objetivo:** orientar a construção incremental do MedPrev com Django, Django Ninja, React, TypeScript e PostgreSQL, preservando o SisMed como fonte oficial somente leitura.
 
+> **Decisão temporária de desenvolvimento:** nesta fase não há conexão com o
+> SisMed institucional. A estrutura e os dados fictícios do dump são copiados
+> para o `db.sqlite3`, onde leitura e escrita são permitidas. As seções de
+> integração institucional deste plano ficam reservadas para uma etapa futura.
+
 ## 1. Resultado esperado
 
 Entregar uma aplicação web segura para consultar dados operacionais do SisMed e executar os fluxos próprios do MedPrev, incluindo controle de acesso, pareceres médicos, anexos e auditoria.
@@ -312,4 +317,3 @@ Uma funcionalidade só será considerada pronta quando:
 ## 11. Próxima ação recomendada
 
 Realizar uma reunião curta de definição do Marco 0 e responder às decisões pendentes dos itens 1 a 7. Em seguida, transformar a primeira consulta e o fluxo mínimo de parecer em critérios de aceitação. Só então estimar duração e distribuir responsáveis.
-

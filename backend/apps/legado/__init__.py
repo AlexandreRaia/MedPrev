@@ -1,1 +1,1 @@
-"""Integração estritamente somente leitura com o SisMed."""
+"""Modelos das tabelas fictícias importadas para o desenvolvimento."""
