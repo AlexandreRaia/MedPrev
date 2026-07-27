@@ -1,6 +1,8 @@
+from collections.abc import Iterable
+
 from django.db.models import Q, QuerySet
 
-from apps.legado.models import Pericia, Protocolo, Servidor
+from apps.legado.models import Pericia, Protocolo, Servidor, SituacaoProtocolo
 
 LIMITE_PADRAO_BUSCA = 20
 LIMITE_MAXIMO_BUSCA = 100
@@ -49,3 +51,16 @@ def pericias_do_protocolo(protocolo_id: int) -> QuerySet[Pericia]:
     """Retorna as perícias associadas ao protocolo informado."""
 
     return Pericia.objects.filter(cd_protocolo=protocolo_id).order_by("-dt_pericia", "-cd_pericia")
+
+
+def descricoes_das_situacoes(situacao_ids: Iterable[int]) -> dict[int, str]:
+    """Mapeia códigos de situação de protocolo para sua descrição."""
+
+    ids = {situacao_id for situacao_id in situacao_ids if situacao_id is not None}
+    if not ids:
+        return {}
+    return dict(
+        SituacaoProtocolo.objects.filter(cd_situacaoprotocolo__in=ids).values_list(
+            "cd_situacaoprotocolo", "ds_situacaoprotocolo"
+        )
+    )

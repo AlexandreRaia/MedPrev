@@ -14,6 +14,7 @@ import {
   Marca,
   TrocaSenhaObrigatoria,
 } from "../features/autenticacao/Login";
+import { Servidores } from "../features/legado/Servidores";
 import { ApiError } from "../shared/api/client";
 
 type EstadoSessao =
@@ -22,7 +23,7 @@ type EstadoSessao =
   | { tipo: "autenticado"; usuario: UsuarioSessao }
   | { tipo: "erro" };
 
-type Tela = "inicio" | SecaoAdministrativa;
+type Tela = "inicio" | "servidores" | SecaoAdministrativa;
 
 export function App() {
   const [estado, setEstado] = useState<EstadoSessao>({ tipo: "carregando" });
@@ -168,10 +169,10 @@ function Aplicacao({
               aoClicar={() => setTela("inicio")}
             />
             <BotaoNavegacao
-              ativo={false}
+              ativo={tela === "servidores"}
               icone="♙"
-              texto="Servidores"
-              desabilitado
+              texto="Consulta"
+              aoClicar={() => setTela("servidores")}
             />
             <BotaoNavegacao
               ativo={false}
@@ -224,6 +225,8 @@ function Aplicacao({
           ) : null}
           {tela === "inicio" ? (
             <PainelInicial usuario={usuario} perfil={perfil} />
+          ) : tela === "servidores" ? (
+            <Servidores />
           ) : podeAdministrar ? (
             <Administracao
               secao={tela}

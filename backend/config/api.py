@@ -5,6 +5,7 @@ from ninja import NinjaAPI, Schema
 
 from apps.contas.admin_api import router as administracao_router
 from apps.contas.api import router as contas_router
+from apps.legado.api import router as legado_router
 
 
 class HealthResponse(Schema):
@@ -19,6 +20,7 @@ api = NinjaAPI(
 )
 api.add_router("/auth", contas_router)
 api.add_router("/administracao", administracao_router)
+api.add_router("/legado", legado_router)
 
 
 @api.get(
