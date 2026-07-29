@@ -8,6 +8,7 @@ export type ServidorResumo = {
   email: string | null;
   ativo: boolean | null;
   admissao: string | null;
+  tramitacao: string | null;
 };
 
 export type ProtocoloResumo = {
@@ -27,6 +28,7 @@ export type PericiaResumo = {
   relatorio: string | null;
   atestado: boolean;
   dias_atestado: number | null;
+  cids: string[];
 };
 
 export type ServidorDetalhe = ServidorResumo & {

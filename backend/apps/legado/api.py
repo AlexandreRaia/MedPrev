@@ -8,12 +8,14 @@ from apps.contas.permissions import (
     CONSULTAR_DADOS,
     nome_completo_da_permissao,
 )
-from apps.legado.models import Pericia, Servidor
+from apps.legado.models import Pericia, Protocolo, Servidor
 from apps.legado.selectors import (
     buscar_servidores,
+    cids_por_protocolo,
     descricoes_das_situacoes,
     pericias_do_protocolo,
     protocolos_do_servidor,
+    protocolos_mais_recentes_por_servidor,
 )
 
 router = Router(tags=["Legado"], auth=django_auth)
@@ -27,6 +29,7 @@ class ServidorResumoSaida(Schema):
     email: str | None
     ativo: bool | None
     admissao: str | None
+    tramitacao: str | None
 
 
 class ProtocoloResumoSaida(Schema):
@@ -46,6 +49,7 @@ class PericiaResumoSaida(Schema):
     relatorio: str | None
     atestado: bool
     dias_atestado: int | None
+    cids: list[str]
 
 
 class ServidorDetalheSaida(ServidorResumoSaida):
@@ -57,7 +61,7 @@ class ServidorDetalheSaida(ServidorResumoSaida):
     pericias: list[PericiaResumoSaida]
 
 
-def _serializar_resumo(servidor: Servidor) -> ServidorResumoSaida:
+def _serializar_resumo(servidor: Servidor, tramitacao: str | None = None) -> ServidorResumoSaida:
     return ServidorResumoSaida(
         id=servidor.cd_servidor,
         nome=servidor.nm_servidor,
@@ -66,10 +70,11 @@ def _serializar_resumo(servidor: Servidor) -> ServidorResumoSaida:
         email=servidor.ds_email,
         ativo=servidor.st_ativo,
         admissao=servidor.dt_admissao.isoformat() if servidor.dt_admissao else None,
+        tramitacao=tramitacao,
     )
 
 
-def _serializar_pericia(pericia: Pericia) -> PericiaResumoSaida:
+def _serializar_pericia(pericia: Pericia, cids: dict[int, list[str]]) -> PericiaResumoSaida:
     return PericiaResumoSaida(
         id=pericia.cd_pericia,
         protocolo_id=pericia.cd_protocolo,
@@ -81,14 +86,33 @@ def _serializar_pericia(pericia: Pericia) -> PericiaResumoSaida:
         relatorio=pericia.ds_relatoriomedico,
         atestado=pericia.ic_atestado == "t",
         dias_atestado=pericia.qt_atestadodias,
+        cids=cids.get(pericia.cd_protocolo, []),
     )
 
 
 @router.get("/servidores", response=list[ServidorResumoSaida])
 def listar_servidores(request, busca: str = ""):
     exigir_permissao(request, CONSULTAR_DADOS)
-    servidores = buscar_servidores(busca)
-    return [_serializar_resumo(servidor) for servidor in servidores]
+    servidores = list(buscar_servidores(busca))
+    protocolos_recentes = protocolos_mais_recentes_por_servidor(
+        servidor.cd_servidor for servidor in servidores
+    )
+    situacoes = descricoes_das_situacoes(
+        protocolo.cd_situacaoprotocolo for protocolo in protocolos_recentes.values()
+    )
+    return [
+        _serializar_resumo(
+            servidor,
+            _situacao_do_protocolo(protocolos_recentes.get(servidor.cd_servidor), situacoes),
+        )
+        for servidor in servidores
+    ]
+
+
+def _situacao_do_protocolo(protocolo: Protocolo | None, situacoes: dict[int, str]) -> str | None:
+    if protocolo is None:
+        return None
+    return situacoes.get(protocolo.cd_situacaoprotocolo)
 
 
 @router.get("/servidores/{servidor_id}", response=ServidorDetalheSaida)
@@ -103,13 +127,16 @@ def consultar_servidor(request, servidor_id: int):
     )
     pericias: list[PericiaResumoSaida] = []
     if pode_ver_historico_medico:
+        cids = cids_por_protocolo(protocolo.cd_protocolo for protocolo in protocolos)
         for protocolo in protocolos:
             pericias.extend(
-                _serializar_pericia(pericia)
+                _serializar_pericia(pericia, cids)
                 for pericia in pericias_do_protocolo(protocolo.cd_protocolo)
             )
 
-    resumo = _serializar_resumo(servidor)
+    resumo = _serializar_resumo(
+        servidor, _situacao_do_protocolo(protocolos[0] if protocolos else None, situacoes)
+    )
     return ServidorDetalheSaida(
         **resumo.model_dump(),
         nascimento=servidor.dt_nascimento.isoformat() if servidor.dt_nascimento else None,

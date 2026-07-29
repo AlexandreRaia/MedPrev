@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "apps.contas",
     "apps.legado",
+    "apps.pareceres",
 ]
 
 MIDDLEWARE = [

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.core.management import call_command
 from django.db import connection, models
 from django.test import Client, SimpleTestCase, TestCase
 
@@ -16,15 +17,18 @@ from apps.legado.models import (
     Licenca,
     Pericia,
     Protocolo,
+    ProtocoloCid,
     Servidor,
     SituacaoProtocolo,
     TabelaImportadaModel,
 )
 from apps.legado.selectors import (
     buscar_servidores,
+    cids_por_protocolo,
     descricoes_das_situacoes,
     pericias_do_protocolo,
     protocolos_do_servidor,
+    protocolos_mais_recentes_por_servidor,
 )
 
 
@@ -161,12 +165,14 @@ class ApiDeServidoresTests(TestCase):
             editor.create_model(SituacaoProtocolo)
             editor.create_model(Protocolo)
             editor.create_model(Pericia)
+            editor.create_model(ProtocoloCid)
         super().setUpClass()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         with connection.schema_editor() as editor:
+            editor.delete_model(ProtocoloCid)
             editor.delete_model(Pericia)
             editor.delete_model(Protocolo)
             editor.delete_model(SituacaoProtocolo)
@@ -219,6 +225,12 @@ class ApiDeServidoresTests(TestCase):
             ic_atestado="t",
             qt_atestadodias=15,
         )
+        ProtocoloCid.objects.create(
+            cd_protocolocid=1,
+            cd_protocolo=1,
+            cd_cid="Z00.0",
+            st_ativo=True,
+        )
 
     def test_recusa_usuario_nao_autenticado(self) -> None:
         response = Client().get("/api/v1/legado/servidores?busca=Maria")
@@ -252,6 +264,23 @@ class ApiDeServidoresTests(TestCase):
         self.assertEqual(dados[0]["id"], 1001)
         self.assertEqual(dados[0]["nome"], "Maria da Silva")
         self.assertEqual(dados[0]["email"], "maria@example.test")
+        self.assertEqual(dados[0]["tramitacao"], "Em andamento")
+
+    def test_busca_por_prontuario_com_prefixo_p(self) -> None:
+        response = self.cliente.get("/api/v1/legado/servidores?busca=P1001")
+
+        self.assertEqual(response.status_code, 200)
+        dados = response.json()
+        self.assertEqual(len(dados), 1)
+        self.assertEqual(dados[0]["id"], 1001)
+
+    def test_busca_por_prontuario_sem_prefixo(self) -> None:
+        response = self.cliente.get("/api/v1/legado/servidores?busca=1001")
+
+        self.assertEqual(response.status_code, 200)
+        dados = response.json()
+        self.assertEqual(len(dados), 1)
+        self.assertEqual(dados[0]["id"], 1001)
 
     def test_detalhe_inclui_protocolos_com_situacao_descrita(self) -> None:
         response = self.cliente.get("/api/v1/legado/servidores/1001")
@@ -260,6 +289,7 @@ class ApiDeServidoresTests(TestCase):
         dados = response.json()
         self.assertEqual(dados["email"], "maria@example.test")
         self.assertEqual(dados["nascimento"], "1988-07-04")
+        self.assertEqual(dados["tramitacao"], "Em andamento")
         self.assertEqual(len(dados["protocolos"]), 1)
         self.assertEqual(dados["protocolos"][0]["situacao"], "Em andamento")
 
@@ -290,6 +320,7 @@ class ApiDeServidoresTests(TestCase):
         )
         self.assertTrue(dados["pericias"][0]["atestado"])
         self.assertEqual(dados["pericias"][0]["dias_atestado"], 15)
+        self.assertEqual(dados["pericias"][0]["cids"], ["Z00.0"])
 
     def test_detalhe_de_servidor_inexistente_retorna_404(self) -> None:
         response = self.cliente.get("/api/v1/legado/servidores/9999")
@@ -323,3 +354,148 @@ class SelectorDeDescricoesDeSituacaoTests(TestCase):
 
     def test_lista_vazia_nao_consulta_o_banco(self) -> None:
         self.assertEqual(descricoes_das_situacoes([]), {})
+
+
+class SelectorDeCidsPorProtocoloTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        with connection.schema_editor() as editor:
+            editor.create_model(ProtocoloCid)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        with connection.schema_editor() as editor:
+            editor.delete_model(ProtocoloCid)
+
+    def test_agrupa_codigos_por_protocolo(self) -> None:
+        ProtocoloCid.objects.create(cd_protocolocid=1, cd_protocolo=1, cd_cid="Z00.0")
+        ProtocoloCid.objects.create(cd_protocolocid=2, cd_protocolo=1, cd_cid="M54.5")
+        ProtocoloCid.objects.create(cd_protocolocid=3, cd_protocolo=2, cd_cid="E11")
+
+        resultado = cids_por_protocolo([1, 2, 9999])
+
+        self.assertEqual(set(resultado[1]), {"Z00.0", "M54.5"})
+        self.assertEqual(resultado[2], ["E11"])
+        self.assertNotIn(9999, resultado)
+
+    def test_lista_vazia_nao_consulta_o_banco(self) -> None:
+        self.assertEqual(cids_por_protocolo([]), {})
+
+
+class SelectorDeProtocolosMaisRecentesTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        with connection.schema_editor() as editor:
+            editor.create_model(Protocolo)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        with connection.schema_editor() as editor:
+            editor.delete_model(Protocolo)
+
+    def test_lista_vazia_nao_consulta_o_banco(self) -> None:
+        self.assertEqual(protocolos_mais_recentes_por_servidor([]), {})
+
+    def test_escolhe_o_protocolo_mais_recente_por_servidor(self) -> None:
+        Protocolo.objects.create(
+            cd_protocolo=1,
+            dt_protocolo="2024-01-10",
+            cd_servidor=1001,
+            cd_situacaoprotocolo=1,
+        )
+        Protocolo.objects.create(
+            cd_protocolo=2,
+            dt_protocolo="2024-03-01",
+            cd_servidor=1001,
+            cd_situacaoprotocolo=2,
+        )
+        Protocolo.objects.create(
+            cd_protocolo=3,
+            dt_protocolo="2024-02-01",
+            cd_servidor=1002,
+            cd_situacaoprotocolo=3,
+        )
+
+        resultado = protocolos_mais_recentes_por_servidor([1001, 1002, 9999])
+
+        self.assertEqual(set(resultado), {1001, 1002})
+        self.assertEqual(resultado[1001].cd_protocolo, 2)
+        self.assertEqual(resultado[1002].cd_protocolo, 3)
+
+
+class ComandoSeedPericiasDemoTests(TestCase):
+    """
+    Comando de conveniência que semeia protocolos, CIDs e perícias fictícias
+    extras para telas de demonstração. Não faz parte do sismed.dump oficial.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with connection.schema_editor() as editor:
+            editor.create_model(Pericia)
+            editor.create_model(Protocolo)
+            editor.create_model(ProtocoloCid)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        with connection.schema_editor() as editor:
+            editor.delete_model(ProtocoloCid)
+            editor.delete_model(Protocolo)
+            editor.delete_model(Pericia)
+
+    def test_cria_cinco_pericias_com_cids_e_datas_diferentes(self) -> None:
+        call_command("seed_pericias_demo")
+
+        pericias = Pericia.objects.filter(cd_pericia__gte=9000).order_by("dt_pericia")
+        self.assertEqual(pericias.count(), 5)
+
+        datas = [pericia.dt_pericia for pericia in pericias]
+        self.assertEqual(len(datas), len(set(datas)))
+        self.assertTrue(any(pericia.ic_atestado == "t" for pericia in pericias))
+        self.assertTrue(any(pericia.ic_atestado is None for pericia in pericias))
+
+        protocolos_das_pericias = {pericia.cd_protocolo for pericia in pericias}
+        self.assertEqual(len(protocolos_das_pericias), 5)
+
+        cids = set(
+            ProtocoloCid.objects.filter(cd_protocolo__in=protocolos_das_pericias).values_list(
+                "cd_cid", flat=True
+            )
+        )
+        self.assertEqual(len(cids), 5)
+
+    def test_protocolos_demo_pertencem_ao_servidor_teste_01(self) -> None:
+        call_command("seed_pericias_demo")
+
+        protocolos = Protocolo.objects.filter(cd_protocolo__gte=9000)
+        self.assertEqual(protocolos.count(), 5)
+        self.assertTrue(all(protocolo.cd_servidor == 1001 for protocolo in protocolos))
+
+    def test_preserva_o_protocolo_e_a_pericia_originais_do_dump(self) -> None:
+        Protocolo.objects.create(cd_protocolo=1, dt_protocolo="2026-07-20", cd_servidor=1001)
+        Pericia.objects.create(
+            cd_pericia=1,
+            cd_protocolo=1,
+            dt_pericia="2026-07-21",
+            ds_subjetivo="Sem queixas relevantes.",
+        )
+
+        call_command("seed_pericias_demo")
+
+        original = Pericia.objects.get(cd_pericia=1)
+        self.assertEqual(original.ds_subjetivo, "Sem queixas relevantes.")
+        self.assertTrue(Protocolo.objects.filter(cd_protocolo=1).exists())
+
+    def test_e_reexecutavel_sem_duplicar_registros(self) -> None:
+        call_command("seed_pericias_demo")
+        call_command("seed_pericias_demo")
+
+        self.assertEqual(Pericia.objects.filter(cd_pericia__gte=9000).count(), 5)
+        self.assertEqual(Protocolo.objects.filter(cd_protocolo__gte=9000).count(), 5)
+        self.assertEqual(ProtocoloCid.objects.filter(cd_protocolocid__gte=9000).count(), 5)

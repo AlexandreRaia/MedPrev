@@ -14,6 +14,8 @@ import {
   Marca,
   TrocaSenhaObrigatoria,
 } from "../features/autenticacao/Login";
+import { Ferramentas } from "../features/ferramentas/Ferramentas";
+import { PainelIndicadores } from "../features/indicadores/PainelIndicadores";
 import { Servidores } from "../features/legado/Servidores";
 import { ApiError } from "../shared/api/client";
 
@@ -23,7 +25,7 @@ type EstadoSessao =
   | { tipo: "autenticado"; usuario: UsuarioSessao }
   | { tipo: "erro" };
 
-type Tela = "inicio" | "servidores" | SecaoAdministrativa;
+type Tela = "inicio" | "servidores" | "ferramentas" | SecaoAdministrativa;
 
 export function App() {
   const [estado, setEstado] = useState<EstadoSessao>({ tipo: "carregando" });
@@ -127,6 +129,9 @@ function Aplicacao({
 }) {
   const [tela, setTela] = useState<Tela>("inicio");
   const podeAdministrar = usuario.permissoes.includes("gerenciar_acessos");
+  const podeVerIndicadores = usuario.permissoes.includes(
+    "visualizar_indicadores_gerenciais",
+  );
   const perfil = usuario.grupos[0] ?? "Sem perfil atribuído";
 
   return (
@@ -181,10 +186,10 @@ function Aplicacao({
               desabilitado
             />
             <BotaoNavegacao
-              ativo={false}
-              icone="◫"
-              texto="Relatórios"
-              desabilitado
+              ativo={tela === "ferramentas"}
+              icone="⚒"
+              texto="Ferramentas"
+              aoClicar={() => setTela("ferramentas")}
             />
             {podeAdministrar ? (
               <>
@@ -224,9 +229,15 @@ function Aplicacao({
             </p>
           ) : null}
           {tela === "inicio" ? (
-            <PainelInicial usuario={usuario} perfil={perfil} />
+            podeVerIndicadores ? (
+              <PainelIndicadores nomeUsuario={usuario.nome} />
+            ) : (
+              <PainelInicial usuario={usuario} perfil={perfil} />
+            )
           ) : tela === "servidores" ? (
-            <Servidores />
+            <Servidores permissoes={usuario.permissoes} usuarioId={usuario.id} />
+          ) : tela === "ferramentas" ? (
+            <Ferramentas />
           ) : podeAdministrar ? (
             <Administracao
               secao={tela}

@@ -227,6 +227,53 @@ describe("App", () => {
     expect(screen.getByText("administracao")).toBeInTheDocument();
   });
 
+  it("mostra o painel de indicadores para quem tem a permissão", async () => {
+    const usuarioGestor = {
+      ...usuarioAdministrador,
+      nome: "Gestora MedPrev",
+      grupos: ["Gestor da Administração"],
+      permissoes: [
+        ...usuarioAdministrador.permissoes,
+        "visualizar_indicadores_gerenciais",
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, usuarioGestor))
+      .mockResolvedValueOnce(
+        resposta(200, {
+          servidores_acompanhados: 4,
+          pericias_60_dias: 13,
+          pareceres_em_rascunho: 2,
+          pericias_com_atestado_60_dias: 5,
+          grupos_cid: [{ codigo: "Z00.0", ocorrencias: 10 }],
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Visão geral" })).toBeInTheDocument();
+    expect(
+      await screen.findByText("2 parecer(es) em rascunho aguardando conclusão."),
+    ).toBeInTheDocument();
+  });
+
+  it("abre a página de ferramentas pelo menu lateral", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(resposta(200, usuarioAdministrador)),
+    );
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Ferramentas" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Ferramentas" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("CID-10")).toBeInTheDocument();
+  });
+
   it("permite configurar e salvar a matriz de acesso", async () => {
     const fetchMock = vi
       .fn()

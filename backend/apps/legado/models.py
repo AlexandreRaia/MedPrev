@@ -196,3 +196,14 @@ class Pericia(TabelaImportadaModel):
     class Meta:
         managed = False
         db_table = "pericia"
+
+
+class ProtocoloCid(TabelaImportadaModel):
+    cd_protocolocid = models.BigIntegerField(primary_key=True)
+    cd_protocolo = models.IntegerField()
+    cd_cid = models.TextField()
+    st_ativo = models.BooleanField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = "protocolocid"
