@@ -12,6 +12,8 @@ from apps.contas.permissions import (
     CONSULTAR_CONTEUDO_MEDICO,
     RESPONDER_SOLICITACAO_APOIO,
     SOLICITAR_APOIO_ESPECIALIZADO,
+    VISUALIZAR_DADOS_GLOBAIS,
+    nome_completo_da_permissao,
 )
 from apps.legado.models import Servidor
 from apps.pareceres.models import Parecer
@@ -45,6 +47,7 @@ class AtendimentoAbertoSaida(Schema):
     servidor_sismed_id: int
     servidor_nome: str | None
     parecer_em_aberto: bool
+    parecer_autor: str | None
     solicitacoes_abertas: int
     solicitacoes_respondidas: int
     ultima_atividade_em: str
@@ -163,21 +166,31 @@ def responder(request, solicitacao_id: int, dados: SolicitacaoApoioResponderEntr
     return _serializar(solicitacao)
 
 
-@router.get("/meus-atendimentos", response=list[AtendimentoAbertoSaida])
-def listar_meus_atendimentos(request):
+@router.get("/atendimentos", response=list[AtendimentoAbertoSaida])
+def listar_atendimentos(request):
     """
-    Casos em que o médico está centralizando o atendimento: tem um parecer
-    próprio em rascunho, e/ou pediu apoio a algum especialista e ainda não foi
-    respondido. Some da lista quando o parecer é concluído e não sobra
+    Casos em andamento: um parecer em rascunho e/ou uma solicitação de apoio
+    ainda sem resposta. Não é filtrado por autor — um colega que assuma o
+    atendimento precisa enxergar o que já está pendente, não só o que ele
+    mesmo abriu. Escopado pela unidade do usuário, a menos que ele tenha
+    visão global. Some da lista quando o parecer é concluído e não sobra
     nenhuma solicitação em aberto — o histórico continua acessível pela
     Consulta.
     """
     exigir_permissao(request, SOLICITAR_APOIO_ESPECIALIZADO)
 
-    pareceres_em_rascunho = list(
-        Parecer.objects.filter(autor=request.user, estado=Parecer.Estado.RASCUNHO)
-    )
-    solicitacoes = list(SolicitacaoApoio.objects.filter(solicitante=request.user))
+    pareceres_em_rascunho_query = Parecer.objects.filter(
+        estado=Parecer.Estado.RASCUNHO
+    ).select_related("autor")
+    solicitacoes_query = SolicitacaoApoio.objects.all()
+    if not request.user.has_perm(nome_completo_da_permissao(VISUALIZAR_DADOS_GLOBAIS)):
+        pareceres_em_rascunho_query = pareceres_em_rascunho_query.filter(
+            unidade=request.user.unidade
+        )
+        solicitacoes_query = solicitacoes_query.filter(unidade=request.user.unidade)
+
+    pareceres_em_rascunho = list(pareceres_em_rascunho_query)
+    solicitacoes = list(solicitacoes_query)
 
     servidor_ids = {parecer.servidor_sismed_id for parecer in pareceres_em_rascunho} | {
         solicitacao.servidor_sismed_id
@@ -217,11 +230,17 @@ def listar_meus_atendimentos(request):
             solicitacao.respondido_em or solicitacao.criado_em
             for solicitacao in solicitacoes_do_servidor
         ]
+        parecer_autor = None
+        if pareceres_do_servidor:
+            autor = pareceres_do_servidor[0].autor
+            parecer_autor = autor.get_full_name() or autor.get_username()
+
         resumos.append(
             AtendimentoAbertoSaida(
                 servidor_sismed_id=servidor_id,
                 servidor_nome=nomes_dos_servidores.get(servidor_id),
                 parecer_em_aberto=len(pareceres_do_servidor) > 0,
+                parecer_autor=parecer_autor,
                 solicitacoes_abertas=abertas,
                 solicitacoes_respondidas=respondidas,
                 ultima_atividade_em=max(datas).isoformat(),

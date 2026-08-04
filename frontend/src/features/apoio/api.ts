@@ -32,6 +32,7 @@ export type AtendimentoAberto = {
   servidor_sismed_id: number;
   servidor_nome: string | null;
   parecer_em_aberto: boolean;
+  parecer_autor: string | null;
   solicitacoes_abertas: number;
   solicitacoes_respondidas: number;
   ultima_atividade_em: string;
@@ -59,10 +60,10 @@ export function listarMinhasSolicitacoes(
   return apiGet("/api/v1/apoio/minhas", signal);
 }
 
-export function listarMeusAtendimentos(
+export function listarAtendimentos(
   signal?: AbortSignal,
 ): Promise<AtendimentoAberto[]> {
-  return apiGet("/api/v1/apoio/meus-atendimentos", signal);
+  return apiGet("/api/v1/apoio/atendimentos", signal);
 }
 
 export async function criarSolicitacao(

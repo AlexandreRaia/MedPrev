@@ -298,7 +298,19 @@ export function DetalheServidorModal({
         ) : null}
 
         {!carregando && !erro && detalhe ? (
-          <div className="prontuario-corpo">
+          <div
+            className={`prontuario-corpo${detalhe.historico_medico_visivel ? " prontuario-corpo--tres-colunas" : ""}`}
+          >
+            {detalhe.historico_medico_visivel ? (
+              <aside className="prontuario-parecer">
+                <SecaoParecer
+                  servidorSismedId={detalhe.id}
+                  permissoes={permissoes}
+                  usuarioId={usuarioId}
+                />
+              </aside>
+            ) : null}
+
             <div className="prontuario-principal">
               {detalhe.tramitacao ? (
                 <div className="banner-tramitacao">
@@ -336,6 +348,28 @@ export function DetalheServidorModal({
                   <dd>{detalhe.telefone ?? detalhe.celular ?? "—"}</dd>
                 </div>
               </dl>
+
+              <div className="resumo-card">
+                <p className="sobretitulo">Resumo · 60 dias</p>
+                <div className="resumo-card__grade">
+                  <span>
+                    <strong>{protocolosUltimos60Dias.length}</strong>
+                    <small>protocolo(s)</small>
+                  </span>
+                  {detalhe.historico_medico_visivel ? (
+                    <>
+                      <span>
+                        <strong>{periciasUltimos60Dias.length}</strong>
+                        <small>registro(s)</small>
+                      </span>
+                      <span>
+                        <strong>{diasDeAtestado60Dias}</strong>
+                        <small>dia(s) atestado</small>
+                      </span>
+                    </>
+                  ) : null}
+                </div>
+              </div>
 
               {detalhe.historico_medico_visivel && gruposCid.length > 0 ? (
                 <div className="alerta-cid">
@@ -442,41 +476,11 @@ export function DetalheServidorModal({
               ) : null}
             </div>
 
-            <aside className="prontuario-lateral">
-              <div className="resumo-card">
-                <p className="sobretitulo">Resumo · 60 dias</p>
-                <div className="resumo-card__grade">
-                  <span>
-                    <strong>{protocolosUltimos60Dias.length}</strong>
-                    <small>protocolo(s)</small>
-                  </span>
-                  {detalhe.historico_medico_visivel ? (
-                    <>
-                      <span>
-                        <strong>{periciasUltimos60Dias.length}</strong>
-                        <small>registro(s)</small>
-                      </span>
-                      <span>
-                        <strong>{diasDeAtestado60Dias}</strong>
-                        <small>dia(s) atestado</small>
-                      </span>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-
-              {detalhe.historico_medico_visivel ? (
-                <SecaoParecer
-                  servidorSismedId={detalhe.id}
-                  permissoes={permissoes}
-                  usuarioId={usuarioId}
-                />
-              ) : null}
-
-              {detalhe.historico_medico_visivel ? (
+            {detalhe.historico_medico_visivel ? (
+              <aside className="prontuario-apoio">
                 <SecaoApoio servidorSismedId={detalhe.id} permissoes={permissoes} />
-              ) : null}
-            </aside>
+              </aside>
+            ) : null}
           </div>
         ) : null}
       </section>
@@ -497,7 +501,20 @@ function SecaoParecer({
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<Parecer | null>(null);
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const podeAlterar = permissoes.includes("alterar_conteudo_medico");
+
+  function alternarExpandido(parecerId: number) {
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(parecerId)) {
+        novo.delete(parecerId);
+      } else {
+        novo.add(parecerId);
+      }
+      return novo;
+    });
+  }
 
   function recarregar() {
     setCarregando(true);
@@ -531,7 +548,7 @@ function SecaoParecer({
 
   return (
     <div className="secao-parecer">
-      <h3>Pareceres</h3>
+      <h3>Pareceres{pareceres.length > 0 ? ` · ${pareceres.length}` : ""}</h3>
 
       {carregando ? (
         <div className="estado-painel" aria-live="polite">
@@ -552,7 +569,10 @@ function SecaoParecer({
 
       {!carregando && pareceres.length > 0 ? (
         <ul className="lista-pareceres">
-          {pareceres.map((parecer) => (
+          {pareceres.map((parecer) => {
+            const textoLongo = parecer.texto.length > 220;
+            const expandido = expandidos.has(parecer.id);
+            return (
             <li key={parecer.id}>
               <div className="lista-pareceres__cabecalho">
                 <span>
@@ -564,7 +584,20 @@ function SecaoParecer({
                   {parecer.estado_descricao}
                 </span>
               </div>
-              <p className="lista-pareceres__texto">{parecer.texto}</p>
+              <p
+                className={`lista-pareceres__texto${textoLongo && !expandido ? " lista-pareceres__texto--truncado" : ""}`}
+              >
+                {parecer.texto}
+              </p>
+              {textoLongo ? (
+                <button
+                  type="button"
+                  className="lista-pareceres__ver-mais"
+                  onClick={() => alternarExpandido(parecer.id)}
+                >
+                  {expandido ? "Ver menos" : "Ver mais"}
+                </button>
+              ) : null}
               <div className="lista-pareceres__rodape">
                 <span className="etiqueta-situacao">{parecer.conclusao_descricao}</span>
                 {parecer.prioritario ? (
@@ -587,7 +620,8 @@ function SecaoParecer({
                 ) : null}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
 

@@ -876,7 +876,7 @@ tbody tr:last-child td {
 }
 
 .modal--prontuario {
-  width: min(1200px, 96vw);
+  width: min(1680px, 97vw);
   max-height: min(860px, 92vh);
   padding: 0;
   display: flex;
@@ -1071,18 +1071,28 @@ tbody tr:last-child td {
   display: grid;
   flex: 1 1 auto;
   min-height: 0;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr;
+}
+
+.prontuario-corpo--tres-colunas {
+  grid-template-columns: 320px 1fr 320px;
+}
+
+.prontuario-corpo--tres-colunas .lista-dados {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .prontuario-principal,
-.prontuario-lateral {
+.prontuario-parecer,
+.prontuario-apoio {
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: none;
 }
 
 .prontuario-principal::-webkit-scrollbar,
-.prontuario-lateral::-webkit-scrollbar {
+.prontuario-parecer::-webkit-scrollbar,
+.prontuario-apoio::-webkit-scrollbar {
   display: none;
 }
 
@@ -1090,14 +1100,23 @@ tbody tr:last-child td {
   padding: 1.4rem 1.5rem 2.2rem;
 }
 
-.prontuario-lateral {
+.prontuario-parecer,
+.prontuario-apoio {
   padding: 1.25rem;
-  border-left: 1px solid var(--line);
   background: var(--bg);
 }
 
+.prontuario-parecer {
+  border-right: 1px solid var(--line);
+}
+
+.prontuario-apoio {
+  border-left: 1px solid var(--line);
+}
+
 .prontuario-principal h3,
-.prontuario-lateral h3 {
+.prontuario-parecer h3,
+.prontuario-apoio h3 {
   margin: 0 0 0.6rem;
   font-size: 0.85rem;
 }
@@ -1135,7 +1154,7 @@ tbody tr:last-child td {
 }
 
 .secao-parecer {
-  margin-top: 1.1rem;
+  margin-top: 0;
 }
 
 .secao-parecer h3 {
@@ -1190,6 +1209,25 @@ tbody tr:last-child td {
   font-size: 0.78rem;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.lista-pareceres__texto--truncado {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.lista-pareceres__ver-mais {
+  display: block;
+  padding: 0;
+  margin: -0.3rem 0 0.6rem;
+  border: none;
+  background: none;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .lista-pareceres__rodape {
@@ -1255,7 +1293,7 @@ tbody tr:last-child td {
 }
 
 .secao-apoio {
-  margin-top: 1.1rem;
+  margin-top: 0;
 }
 
 .secao-apoio h3 {
@@ -1649,7 +1687,10 @@ tbody tr:last-child td {
 
 .lista-dados dd {
   margin: 0.15rem 0 0;
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grade-unidades {
@@ -1823,6 +1864,20 @@ tbody tr:last-child td {
 
   .topbar {
     grid-template-columns: 1fr auto;
+  }
+
+  .prontuario-corpo--tres-colunas {
+    grid-template-columns: 1fr;
+  }
+
+  .prontuario-parecer {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .prontuario-apoio {
+    border-left: none;
+    border-top: 1px solid var(--line);
   }
 }
 

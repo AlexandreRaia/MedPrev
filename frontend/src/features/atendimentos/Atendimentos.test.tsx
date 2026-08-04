@@ -30,6 +30,7 @@ const atendimentoAberto = {
   servidor_sismed_id: 1001,
   servidor_nome: "Maria da Silva",
   parecer_em_aberto: true,
+  parecer_autor: "Ana Souza",
   solicitacoes_abertas: 1,
   solicitacoes_respondidas: 2,
   ultima_atividade_em: "2026-07-01T10:00:00Z",
@@ -149,6 +150,7 @@ describe("Atendimentos — atendimentos do médico", () => {
 
     expect(await screen.findByText("Maria da Silva")).toBeInTheDocument();
     expect(screen.getByText("Em rascunho")).toBeInTheDocument();
+    expect(screen.getByText("Ana Souza")).toBeInTheDocument();
     expect(screen.getByText("1 aguardando")).toBeInTheDocument();
     expect(screen.getByText("2 respondida(s)")).toBeInTheDocument();
   });

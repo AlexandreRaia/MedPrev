@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   AtendimentoAberto,
-  listarMeusAtendimentos,
+  listarAtendimentos,
   listarMinhasSolicitacoes,
   MinhaSolicitacaoApoio,
   responderSolicitacao,
@@ -21,12 +21,12 @@ export function Atendimentos({
     return <FilaDeSolicitacoes />;
   }
   if (permissoes.includes("solicitar_apoio_especializado")) {
-    return <MeusAtendimentos permissoes={permissoes} usuarioId={usuarioId} />;
+    return <AtendimentosDaUnidade permissoes={permissoes} usuarioId={usuarioId} />;
   }
   return null;
 }
 
-function MeusAtendimentos({
+function AtendimentosDaUnidade({
   permissoes,
   usuarioId,
 }: {
@@ -40,7 +40,7 @@ function MeusAtendimentos({
 
   useEffect(() => {
     const controlador = new AbortController();
-    listarMeusAtendimentos(controlador.signal)
+    listarAtendimentos(controlador.signal)
       .then((resultado) => {
         setAtendimentos(resultado);
         setErro(null);
@@ -58,8 +58,11 @@ function MeusAtendimentos({
       <header className="cabecalho-secao">
         <div>
           <p className="sobretitulo">Atendimentos</p>
-          <h1>Seus atendimentos em andamento</h1>
-          <p>Casos com parecer em rascunho ou solicitação de apoio pendente.</p>
+          <h1>Atendimentos em andamento</h1>
+          <p>
+            Casos da sua unidade com parecer em rascunho ou solicitação de apoio pendente —
+            de qualquer colega, não só os seus.
+          </p>
         </div>
       </header>
       <section className="painel">
@@ -103,9 +106,14 @@ function MeusAtendimentos({
                       </span>
                     </td>
                     <td>
-                      <span className="etiqueta-estado">
-                        {atendimento.parecer_em_aberto ? "Em rascunho" : "Sem parecer aberto"}
-                      </span>
+                      {atendimento.parecer_em_aberto ? (
+                        <>
+                          <span className="etiqueta-estado">Em rascunho</span>{" "}
+                          <span className="texto-secundario">{atendimento.parecer_autor}</span>
+                        </>
+                      ) : (
+                        <span className="texto-secundario">Sem parecer aberto</span>
+                      )}
                     </td>
                     <td>
                       {atendimento.solicitacoes_abertas === 0 &&

@@ -294,6 +294,44 @@ describe("Servidores", () => {
     expect(screen.queryByPlaceholderText(/Descreva a avaliação clínica/)).not.toBeInTheDocument();
   });
 
+  it("mostra a contagem de pareceres no título da seção", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, [parecerConcluido]))
+      .mockResolvedValueOnce(resposta(200, []));
+
+    await abrirModal(fetchMock, permissoesSemAlterar);
+
+    expect(await screen.findByText("Pareceres · 1")).toBeInTheDocument();
+  });
+
+  it("trunca um parecer longo e permite expandir com Ver mais", async () => {
+    const parecerLongo = {
+      ...parecerConcluido,
+      id: 6,
+      texto: "Paciente relata dor lombar recorrente. ".repeat(10),
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, [parecerLongo]))
+      .mockResolvedValueOnce(resposta(200, []));
+
+    await abrirModal(fetchMock, permissoesSemAlterar);
+
+    const botaoVerMais = await screen.findByRole("button", { name: "Ver mais" });
+    const texto = screen.getByText(parecerLongo.texto.trim().replace(/\s+/g, " "));
+    expect(texto).toHaveClass("lista-pareceres__texto--truncado");
+
+    fireEvent.click(botaoVerMais);
+
+    expect(texto).not.toHaveClass("lista-pareceres__texto--truncado");
+    expect(screen.getByRole("button", { name: "Ver menos" })).toBeInTheDocument();
+  });
+
   it("mostra o formulário de parecer para quem pode alterar conteúdo médico", async () => {
     const fetchMock = vi
       .fn()

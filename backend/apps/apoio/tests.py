@@ -224,15 +224,15 @@ class ApiDeApoioTests(TestCase):
         solicitacao = SolicitacaoApoio.objects.get(pk=response.json()["id"])
         self.assertEqual(solicitacao.unidade, self.medico.unidade)
 
-    def test_recusa_meus_atendimentos_sem_permissao(self) -> None:
-        response = self.cliente_enfermagem.get("/api/v1/apoio/meus-atendimentos")
+    def test_recusa_atendimentos_sem_permissao(self) -> None:
+        response = self.cliente_enfermagem.get("/api/v1/apoio/atendimentos")
 
         self.assertEqual(response.status_code, 403)
 
-    def test_meus_atendimentos_mostra_solicitacao_aberta_sem_parecer(self) -> None:
+    def test_atendimentos_mostra_solicitacao_aberta_sem_parecer(self) -> None:
         self._post(self.cliente_medico, "/api/v1/apoio", self._payload_criacao())
 
-        response = self.cliente_medico.get("/api/v1/apoio/meus-atendimentos")
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
 
         self.assertEqual(response.status_code, 200)
         dados = response.json()
@@ -240,10 +240,11 @@ class ApiDeApoioTests(TestCase):
         self.assertEqual(dados[0]["servidor_sismed_id"], 1001)
         self.assertEqual(dados[0]["servidor_nome"], "Servidor Teste")
         self.assertFalse(dados[0]["parecer_em_aberto"])
+        self.assertIsNone(dados[0]["parecer_autor"])
         self.assertEqual(dados[0]["solicitacoes_abertas"], 1)
         self.assertEqual(dados[0]["solicitacoes_respondidas"], 0)
 
-    def test_meus_atendimentos_mostra_parecer_em_rascunho_sem_solicitacao(self) -> None:
+    def test_atendimentos_mostra_parecer_em_rascunho_sem_solicitacao(self) -> None:
         criar_parecer(
             ator=self.medico,
             servidor_sismed_id=1001,
@@ -255,14 +256,15 @@ class ApiDeApoioTests(TestCase):
             concluir=False,
         )
 
-        response = self.cliente_medico.get("/api/v1/apoio/meus-atendimentos")
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
 
         dados = response.json()
         self.assertEqual(len(dados), 1)
         self.assertTrue(dados[0]["parecer_em_aberto"])
+        self.assertEqual(dados[0]["parecer_autor"], self.medico.get_username())
         self.assertEqual(dados[0]["solicitacoes_abertas"], 0)
 
-    def test_meus_atendimentos_some_quando_tudo_e_concluido(self) -> None:
+    def test_atendimentos_some_quando_tudo_e_concluido(self) -> None:
         parecer = criar_parecer(
             ator=self.medico,
             servidor_sismed_id=1001,
@@ -280,17 +282,17 @@ class ApiDeApoioTests(TestCase):
             {"texto_resposta": "Concluído."},
         )
 
-        ainda_aberto = self.cliente_medico.get("/api/v1/apoio/meus-atendimentos").json()
+        ainda_aberto = self.cliente_medico.get("/api/v1/apoio/atendimentos").json()
         self.assertEqual(len(ainda_aberto), 1)
         self.assertTrue(ainda_aberto[0]["parecer_em_aberto"])
         self.assertEqual(ainda_aberto[0]["solicitacoes_respondidas"], 1)
 
         concluir_parecer(ator=self.medico, parecer=parecer)
 
-        response = self.cliente_medico.get("/api/v1/apoio/meus-atendimentos")
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
         self.assertEqual(response.json(), [])
 
-    def test_meus_atendimentos_continua_visivel_se_sobrar_solicitacao_aberta(self) -> None:
+    def test_atendimentos_continua_visivel_se_sobrar_solicitacao_aberta(self) -> None:
         parecer = criar_parecer(
             ator=self.medico,
             servidor_sismed_id=1001,
@@ -308,9 +310,57 @@ class ApiDeApoioTests(TestCase):
         )
         concluir_parecer(ator=self.medico, parecer=parecer)
 
-        response = self.cliente_medico.get("/api/v1/apoio/meus-atendimentos")
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
 
         dados = response.json()
         self.assertEqual(len(dados), 1)
         self.assertFalse(dados[0]["parecer_em_aberto"])
         self.assertEqual(dados[0]["solicitacoes_abertas"], 1)
+
+    def test_atendimentos_mostra_pendencia_aberta_por_outro_medico_da_mesma_unidade(self) -> None:
+        outro_medico = get_user_model().objects.create_user(
+            username="medico.colega",
+            password="Senha-ficticia-123",
+            unidade=self.medico.unidade,
+        )
+        outro_medico.groups.add(Group.objects.get(name="Médico"))
+        criar_parecer(
+            ator=outro_medico,
+            servidor_sismed_id=1001,
+            protocolo_sismed_id=None,
+            texto="Parecer de outro médico.",
+            conclusao="acompanhamento",
+            prioritario=False,
+            data_reavaliacao=None,
+            concluir=False,
+        )
+
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
+
+        dados = response.json()
+        self.assertEqual(len(dados), 1)
+        self.assertTrue(dados[0]["parecer_em_aberto"])
+        self.assertEqual(dados[0]["parecer_autor"], "medico.colega")
+
+    def test_atendimentos_nao_mostra_pendencia_de_outra_unidade(self) -> None:
+        outra_unidade = Unidade.objects.get(codigo="caixa-de-previdencia")
+        medico_de_outra_unidade = get_user_model().objects.create_user(
+            username="medico.outra.unidade",
+            password="Senha-ficticia-123",
+            unidade=outra_unidade,
+        )
+        medico_de_outra_unidade.groups.add(Group.objects.get(name="Médico"))
+        criar_parecer(
+            ator=medico_de_outra_unidade,
+            servidor_sismed_id=1001,
+            protocolo_sismed_id=None,
+            texto="Parecer de outra unidade.",
+            conclusao="acompanhamento",
+            prioritario=False,
+            data_reavaliacao=None,
+            concluir=False,
+        )
+
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
+
+        self.assertEqual(response.json(), [])
