@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.contas",
     "apps.legado",
     "apps.pareceres",
+    "apps.apoio",
 ]
 
 MIDDLEWARE = [

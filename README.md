@@ -113,7 +113,8 @@ que ele pode fazer; a unidade define o escopo padrão dos dados. A permissão
 `visualizar_dados_globais` é a exceção explícita para perfis gestores.
 
 A matriz do MVP possui os perfis Administrador, Gestor da Administração,
-Operador Administrativo, Médico do Trabalho, Médico Perito e Auditor.
+Operador Administrativo, Médico, Enfermagem, Neuropsicólogo, Assistente Social
+e Segurança do Trabalho.
 
 Endpoints:
 

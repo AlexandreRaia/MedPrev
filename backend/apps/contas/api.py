@@ -196,8 +196,9 @@ def consultar_matriz(request) -> list[PerfilSaida]:
                 content_type__model="usuario",
             ).values_list("codename", flat=True)
         )
-        for grupo in Group.objects.filter(name__in=PERFIS_E_PERMISSOES)
-        .prefetch_related("permissions")
+        for grupo in Group.objects.filter(name__in=PERFIS_E_PERMISSOES).prefetch_related(
+            "permissions"
+        )
     }
     return [
         PerfilSaida(

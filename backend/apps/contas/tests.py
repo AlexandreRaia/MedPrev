@@ -19,7 +19,7 @@ class ConfiguracaoDoUsuarioTests(SimpleTestCase):
 
 
 class PerfisIniciaisTests(TestCase):
-    def test_migration_configura_os_seis_perfis(self) -> None:
+    def test_migration_configura_os_perfis_esperados(self) -> None:
         self.assertSetEqual(
             set(Group.objects.values_list("name", flat=True)),
             set(PERFIS_E_PERMISSOES),
@@ -93,7 +93,7 @@ class ApiDeAutenticacaoTests(TestCase):
         self.assertIsNone(evento.usuario)
 
     def test_login_e_consulta_da_sessao(self) -> None:
-        self.usuario.groups.add(Group.objects.get(name="Médico Perito"))
+        self.usuario.groups.add(Group.objects.get(name="Médico"))
 
         login_response = self._login()
         me_response = self.cliente.get("/api/v1/auth/me")
@@ -102,11 +102,11 @@ class ApiDeAutenticacaoTests(TestCase):
         self.assertEqual(me_response.status_code, 200)
         self.assertEqual(me_response.json()["usuario"], "medico.teste")
         self.assertEqual(me_response.json()["nome"], "Médico Teste")
-        self.assertEqual(me_response.json()["grupos"], ["Médico Perito"])
+        self.assertEqual(me_response.json()["grupos"], ["Médico"])
         self.assertEqual(me_response.json()["unidade"]["codigo"], "administracao")
         self.assertSetEqual(
             set(me_response.json()["permissoes"]),
-            set(PERFIS_E_PERMISSOES["Médico Perito"]),
+            set(PERFIS_E_PERMISSOES["Médico"]),
         )
         self.assertTrue(
             EventoAutenticacao.objects.filter(
@@ -205,9 +205,7 @@ class ApiAdministrativaTests(TestCase):
         )
         self.admin.groups.add(Group.objects.get(name="Administrador"))
         self.cliente = Client(enforce_csrf_checks=True)
-        self.csrf_token = self.cliente.get("/api/v1/auth/csrf").json()[
-            "csrf_token"
-        ]
+        self.csrf_token = self.cliente.get("/api/v1/auth/csrf").json()["csrf_token"]
         response = self.cliente.post(
             "/api/v1/auth/login",
             data=json.dumps(
@@ -242,19 +240,19 @@ class ApiAdministrativaTests(TestCase):
         response = self._post(
             "/api/v1/administracao/usuarios",
             {
-                "usuario": "perito.teste",
-                "nome": "Perito Teste",
-                "email": "perito@example.test",
+                "usuario": "medico.teste2",
+                "nome": "Médico Teste",
+                "email": "medico2@example.test",
                 "senha_temporaria": "Senha-temporaria-456",
-                "perfil": "Médico Perito",
+                "perfil": "Médico",
                 "unidade_id": self.unidade.pk,
             },
         )
 
         self.assertEqual(response.status_code, 201)
-        usuario = get_user_model().objects.get(username="perito.teste")
+        usuario = get_user_model().objects.get(username="medico.teste2")
         self.assertEqual(usuario.unidade, self.unidade)
-        self.assertEqual(list(usuario.groups.values_list("name", flat=True)), ["Médico Perito"])
+        self.assertEqual(list(usuario.groups.values_list("name", flat=True)), ["Médico"])
         self.assertTrue(usuario.deve_trocar_senha)
         self.assertTrue(
             EventoAcesso.objects.filter(
@@ -344,28 +342,24 @@ class ApiAdministrativaTests(TestCase):
         response = self.cliente.get("/api/v1/administracao/unidades")
 
         self.assertEqual(response.status_code, 200)
-        administracao = next(
-            item
-            for item in response.json()
-            if item["codigo"] == "administracao"
-        )
+        administracao = next(item for item in response.json() if item["codigo"] == "administracao")
         self.assertEqual(administracao["usuarios_vinculados"], 1)
         self.assertEqual(administracao["usuarios_ativos"], 1)
 
     def test_configura_permissoes_de_um_perfil_e_audita(self) -> None:
         response = self._patch(
-            "/api/v1/administracao/perfis/Auditor/permissoes",
+            "/api/v1/administracao/perfis/Enfermagem/permissoes",
             {
                 "permissoes": [
                     "consultar_dados",
-                    "visualizar_auditoria",
-                    "visualizar_indicadores_gerenciais",
+                    "consultar_conteudo_medico",
+                    "visualizar_dados_globais",
                 ]
             },
         )
 
         self.assertEqual(response.status_code, 200)
-        grupo = Group.objects.get(name="Auditor")
+        grupo = Group.objects.get(name="Enfermagem")
         self.assertSetEqual(
             set(
                 grupo.permissions.filter(
@@ -374,15 +368,15 @@ class ApiAdministrativaTests(TestCase):
             ),
             {
                 "consultar_dados",
-                "visualizar_auditoria",
-                "visualizar_indicadores_gerenciais",
+                "consultar_conteudo_medico",
+                "visualizar_dados_globais",
             },
         )
         self.assertTrue(
             EventoAcesso.objects.filter(
                 ator=self.admin,
                 acao=EventoAcesso.Acao.MATRIZ_ATUALIZADA,
-                detalhes__perfil="Auditor",
+                detalhes__perfil="Enfermagem",
             ).exists()
         )
 
@@ -394,7 +388,9 @@ class ApiAdministrativaTests(TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertTrue(
-            Group.objects.get(name="Administrador").permissions.filter(
+            Group.objects.get(name="Administrador")
+            .permissions.filter(
                 codename="gerenciar_acessos",
-            ).exists()
+            )
+            .exists()
         )

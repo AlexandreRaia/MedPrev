@@ -302,7 +302,7 @@ class ApiDeServidoresTests(TestCase):
         self.assertEqual(dados["pericias"], [])
 
     def test_detalhe_inclui_historico_medico_com_a_permissao_especifica(self) -> None:
-        self.usuario.groups.add(Group.objects.get(name="Médico do Trabalho"))
+        self.usuario.groups.add(Group.objects.get(name="Médico"))
 
         response = self.cliente.get("/api/v1/legado/servidores/1001")
 

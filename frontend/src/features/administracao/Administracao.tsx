@@ -792,9 +792,9 @@ const PERMISSOES_DISPONIVEIS = [
   "alterar_dados_administrativos",
   "consultar_conteudo_medico",
   "alterar_conteudo_medico",
-  "visualizar_auditoria",
   "visualizar_dados_globais",
-  "visualizar_indicadores_gerenciais",
+  "solicitar_apoio_especializado",
+  "responder_solicitacao_apoio",
 ];
 
 function TelaMatriz({

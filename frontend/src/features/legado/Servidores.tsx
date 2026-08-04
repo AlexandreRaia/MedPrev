@@ -1,6 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import {
+  criarSolicitacao,
+  Especialidade,
+  listarSolicitacoesDoServidor,
+  SolicitacaoApoio,
+} from "../apoio/api";
+import {
   concluirParecer,
   criarParecer,
   editarParecer,
@@ -209,7 +215,7 @@ export function Servidores({
   );
 }
 
-function DetalheServidorModal({
+export function DetalheServidorModal({
   servidorId,
   permissoes,
   usuarioId,
@@ -466,6 +472,10 @@ function DetalheServidorModal({
                   usuarioId={usuarioId}
                 />
               ) : null}
+
+              {detalhe.historico_medico_visivel ? (
+                <SecaoApoio servidorSismedId={detalhe.id} permissoes={permissoes} />
+              ) : null}
             </aside>
           </div>
         ) : null}
@@ -715,6 +725,193 @@ function FormularioParecer({
           </button>
         ) : null}
       </div>
+    </form>
+  );
+}
+
+const ESPECIALIDADES_DE_APOIO: { valor: Especialidade; rotulo: string }[] = [
+  { valor: "neuropsicologia", rotulo: "Neuropsicólogo" },
+  { valor: "assistencia_social", rotulo: "Assistente Social" },
+  { valor: "seguranca_trabalho", rotulo: "Segurança do Trabalho" },
+];
+
+function SecaoApoio({
+  servidorSismedId,
+  permissoes,
+}: {
+  servidorSismedId: number;
+  permissoes: string[];
+}) {
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoApoio[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const podeSolicitar = permissoes.includes("solicitar_apoio_especializado");
+
+  function recarregar() {
+    setCarregando(true);
+    listarSolicitacoesDoServidor(servidorSismedId)
+      .then((resultado) => {
+        setSolicitacoes(resultado);
+        setErro(null);
+      })
+      .catch((error: unknown) => setErro(mensagemDoErro(error)))
+      .finally(() => setCarregando(false));
+  }
+
+  useEffect(() => {
+    let ativo = true;
+    listarSolicitacoesDoServidor(servidorSismedId)
+      .then((resultado) => {
+        if (!ativo) return;
+        setSolicitacoes(resultado);
+        setErro(null);
+      })
+      .catch((error: unknown) => {
+        if (ativo) setErro(mensagemDoErro(error));
+      })
+      .finally(() => {
+        if (ativo) setCarregando(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [servidorSismedId]);
+
+  return (
+    <div className="secao-apoio">
+      <h3>Apoio multidisciplinar</h3>
+
+      {carregando ? (
+        <div className="estado-painel" aria-live="polite">
+          <span className="carregando-indicador" aria-hidden="true" />
+          <p>Carregando solicitações de apoio…</p>
+        </div>
+      ) : null}
+
+      {erro ? (
+        <p className="mensagem-erro" role="alert">
+          {erro}
+        </p>
+      ) : null}
+
+      {!carregando && !erro && solicitacoes.length === 0 ? (
+        <p className="texto-secundario">Nenhuma solicitação de apoio registrada.</p>
+      ) : null}
+
+      {!carregando && solicitacoes.length > 0 ? (
+        <ul className="lista-solicitacoes-apoio">
+          {solicitacoes.map((solicitacao) => (
+            <li key={solicitacao.id}>
+              <div className="lista-solicitacoes-apoio__cabecalho">
+                <span>
+                  {solicitacao.especialidade_descricao} · solicitado por{" "}
+                  {solicitacao.solicitante}
+                </span>
+                <span
+                  className={`etiqueta-estado${solicitacao.estado === "respondida" ? " etiqueta-estado--concluido" : ""}`}
+                >
+                  {solicitacao.estado_descricao}
+                </span>
+              </div>
+              <p className="lista-solicitacoes-apoio__texto">
+                {solicitacao.texto_solicitacao}
+              </p>
+              {solicitacao.estado === "respondida" ? (
+                <div className="lista-solicitacoes-apoio__resposta">
+                  <span>{solicitacao.respondente} respondeu</span>
+                  <p>{solicitacao.texto_resposta}</p>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {podeSolicitar ? (
+        <FormularioSolicitacaoApoio
+          servidorSismedId={servidorSismedId}
+          aoSalvar={recarregar}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function FormularioSolicitacaoApoio({
+  servidorSismedId,
+  aoSalvar,
+}: {
+  servidorSismedId: number;
+  aoSalvar: () => void;
+}) {
+  const [especialidade, setEspecialidade] = useState<Especialidade>(
+    ESPECIALIDADES_DE_APOIO[0].valor,
+  );
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function enviar() {
+    if (!texto.trim()) {
+      setErro("Descreva o motivo da solicitação antes de enviar.");
+      return;
+    }
+    setEnviando(true);
+    setErro(null);
+    try {
+      await criarSolicitacao({
+        servidor_sismed_id: servidorSismedId,
+        especialidade,
+        texto_solicitacao: texto,
+      });
+      setTexto("");
+      aoSalvar();
+    } catch (error) {
+      setErro(mensagemDoErro(error));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <form
+      className="formulario-solicitacao-apoio"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void enviar();
+      }}
+    >
+      <p className="sobretitulo">Solicitar apoio</p>
+      <label>
+        Especialidade
+        <select
+          value={especialidade}
+          onChange={(event) => setEspecialidade(event.target.value as Especialidade)}
+        >
+          {ESPECIALIDADES_DE_APOIO.map((opcao) => (
+            <option key={opcao.valor} value={opcao.valor}>
+              {opcao.rotulo}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Motivo da solicitação
+        <textarea
+          value={texto}
+          onChange={(event) => setTexto(event.target.value)}
+          placeholder="Descreva o que precisa ser avaliado…"
+          rows={4}
+        />
+      </label>
+      {erro ? (
+        <p className="mensagem-erro" role="alert">
+          {erro}
+        </p>
+      ) : null}
+      <button type="submit" className="botao botao--primario" disabled={enviando}>
+        Enviar solicitação
+      </button>
     </form>
   );
 }

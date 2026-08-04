@@ -11,6 +11,8 @@ export type Indicadores = {
   pareceres_em_rascunho: number;
   pericias_com_atestado_60_dias: number;
   grupos_cid: GrupoCidIndicador[];
+  solicitacoes_apoio_abertas: number;
+  minhas_solicitacoes_pendentes: number | null;
 };
 
 export function consultarIndicadores(signal?: AbortSignal): Promise<Indicadores> {

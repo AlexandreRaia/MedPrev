@@ -12,7 +12,15 @@ const PALETA_CID = [
   "var(--cyan)",
 ];
 
-export function PainelIndicadores({ nomeUsuario }: { nomeUsuario: string }) {
+export function PainelIndicadores({
+  nomeUsuario,
+  permissoes,
+  aoAbrirAtendimentos,
+}: {
+  nomeUsuario: string;
+  permissoes: string[];
+  aoAbrirAtendimentos?: () => void;
+}) {
   const [indicadores, setIndicadores] = useState<Indicadores | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
@@ -63,6 +71,10 @@ export function PainelIndicadores({ nomeUsuario }: { nomeUsuario: string }) {
     (total, grupo) => total + grupo.ocorrencias,
     0,
   );
+
+  const rotuloMinhasPendencias = permissoes.includes("responder_solicitacao_apoio")
+    ? "Solicitações pendentes para você"
+    : "Suas solicitações aguardando resposta";
 
   return (
     <div className="painel-indicadores">
@@ -116,6 +128,30 @@ export function PainelIndicadores({ nomeUsuario }: { nomeUsuario: string }) {
           rotulo="Perícias com atestado"
           detalhe="Últimos 60 dias"
         />
+        <CartaoIndicador
+          tom="azul"
+          icone="⇄"
+          valor={String(indicadores.solicitacoes_apoio_abertas)}
+          rotulo="Solicitações de apoio abertas"
+          detalhe="Aguardando resposta do especialista"
+        />
+        {indicadores.minhas_solicitacoes_pendentes !== null ? (
+          <button
+            type="button"
+            className="cartao-indicador cartao-indicador--amarelo cartao-indicador--clicavel"
+            onClick={aoAbrirAtendimentos}
+            disabled={!aoAbrirAtendimentos}
+          >
+            <span className="cartao-indicador__icone" aria-hidden="true">
+              ◷
+            </span>
+            <div>
+              <strong>{indicadores.minhas_solicitacoes_pendentes}</strong>
+              <h2>{rotuloMinhasPendencias}</h2>
+              <p>{aoAbrirAtendimentos ? "Ver em Atendimentos →" : "Acompanhe pela Consulta"}</p>
+            </div>
+          </button>
+        ) : null}
       </section>
 
       <section className="indicadores-graficos">

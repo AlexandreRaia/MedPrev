@@ -3,6 +3,7 @@ from typing import Literal
 from django.conf import settings
 from ninja import NinjaAPI, Schema
 
+from apps.apoio.api import router as apoio_router
 from apps.contas.admin_api import router as administracao_router
 from apps.contas.api import router as contas_router
 from apps.legado.api import router as legado_router
@@ -25,6 +26,7 @@ api.add_router("/administracao", administracao_router)
 api.add_router("/legado", legado_router)
 api.add_router("/pareceres", pareceres_router)
 api.add_router("/indicadores", indicadores_router)
+api.add_router("/apoio", apoio_router)
 
 
 @api.get(

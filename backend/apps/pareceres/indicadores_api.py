@@ -3,8 +3,13 @@ import datetime
 from ninja import Router, Schema
 from ninja.security import django_auth
 
-from apps.contas.api import exigir_permissao
-from apps.contas.permissions import VISUALIZAR_INDICADORES_GERENCIAIS
+from apps.apoio.models import SolicitacaoApoio
+from apps.contas.permissions import (
+    RESPONDER_SOLICITACAO_APOIO,
+    SOLICITAR_APOIO_ESPECIALIZADO,
+    VISUALIZAR_DADOS_GLOBAIS,
+    nome_completo_da_permissao,
+)
 from apps.legado.models import Pericia
 from apps.legado.selectors import cids_por_protocolo
 from apps.pareceres.models import Parecer
@@ -25,11 +30,33 @@ class IndicadoresSaida(Schema):
     pareceres_em_rascunho: int
     pericias_com_atestado_60_dias: int
     grupos_cid: list[GrupoCidIndicador]
+    solicitacoes_apoio_abertas: int
+    minhas_solicitacoes_pendentes: int | None
+
+
+def _tem_permissao(request, codename: str) -> bool:
+    return request.user.has_perm(nome_completo_da_permissao(codename))
 
 
 @router.get("", response=IndicadoresSaida)
 def consultar_indicadores(request):
-    exigir_permissao(request, VISUALIZAR_INDICADORES_GERENCIAIS)
+    """
+    Os indicadores são agregados e não identificam nenhum servidor
+    individualmente, então qualquer perfil autenticado pode consultá-los. As
+    métricas derivadas do MedPrev (Parecer, SolicitacaoApoio) são escopadas
+    pela unidade do usuário, a menos que ele tenha visão global. As métricas
+    derivadas puramente do legado (perícias, CIDs) não têm unidade do MedPrev
+    associada no schema atual e continuam agregadas em todo o legado.
+    """
+
+    visao_global = _tem_permissao(request, VISUALIZAR_DADOS_GLOBAIS)
+    unidade_do_usuario = request.user.unidade
+
+    pareceres = Parecer.objects.all()
+    solicitacoes = SolicitacaoApoio.objects.all()
+    if not visao_global:
+        pareceres = pareceres.filter(unidade=unidade_do_usuario)
+        solicitacoes = solicitacoes.filter(unidade=unidade_do_usuario)
 
     limite = datetime.date.today() - datetime.timedelta(days=JANELA_EM_DIAS)
     pericias_recentes = list(Pericia.objects.filter(dt_pericia__gte=limite))
@@ -48,12 +75,34 @@ def consultar_indicadores(request):
         reverse=True,
     )
 
+    minhas_solicitacoes_pendentes: int | None = None
+    if _tem_permissao(request, RESPONDER_SOLICITACAO_APOIO):
+        grupos_do_usuario = set(request.user.groups.values_list("name", flat=True))
+        especialidades_do_usuario = [
+            codigo
+            for codigo, descricao in SolicitacaoApoio.Especialidade.choices
+            if descricao in grupos_do_usuario
+        ]
+        minhas_solicitacoes_pendentes = SolicitacaoApoio.objects.filter(
+            estado=SolicitacaoApoio.Estado.ABERTA,
+            especialidade__in=especialidades_do_usuario,
+        ).count()
+    elif _tem_permissao(request, SOLICITAR_APOIO_ESPECIALIZADO):
+        minhas_solicitacoes_pendentes = SolicitacaoApoio.objects.filter(
+            estado=SolicitacaoApoio.Estado.ABERTA,
+            solicitante=request.user,
+        ).count()
+
     return IndicadoresSaida(
-        servidores_acompanhados=Parecer.objects.values("servidor_sismed_id").distinct().count(),
+        servidores_acompanhados=pareceres.values("servidor_sismed_id").distinct().count(),
         pericias_60_dias=len(pericias_recentes),
-        pareceres_em_rascunho=Parecer.objects.filter(estado=Parecer.Estado.RASCUNHO).count(),
+        pareceres_em_rascunho=pareceres.filter(estado=Parecer.Estado.RASCUNHO).count(),
         pericias_com_atestado_60_dias=sum(
             1 for pericia in pericias_recentes if pericia.ic_atestado == "t"
         ),
         grupos_cid=grupos_cid,
+        solicitacoes_apoio_abertas=solicitacoes.filter(
+            estado=SolicitacaoApoio.Estado.ABERTA
+        ).count(),
+        minhas_solicitacoes_pendentes=minhas_solicitacoes_pendentes,
     )

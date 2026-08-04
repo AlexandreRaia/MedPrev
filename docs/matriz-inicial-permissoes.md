@@ -19,17 +19,43 @@ usuário a várias unidades.
 
 ## Perfis
 
-| Perfil | Consultar dados | Alterar administrativos | Consultar médico | Alterar médico | Gerenciar acessos | Ver auditoria | Visão global | Indicadores gerenciais |
+`Médico do Trabalho` e `Médico Perito` tinham exatamente as mesmas permissões —
+a unidade do usuário (Medicina do Trabalho ou Caixa de Previdência) já
+distinguia quem era quem. Os dois viraram um único perfil `Médico`. A vaga
+liberada, mais três novas, formam a equipe de apoio multidisciplinar da
+Medicina do Trabalho: `Enfermagem`, `Neuropsicólogo`, `Assistente Social` e
+`Segurança do Trabalho`.
+
+| Perfil | Consultar dados | Alterar administrativos | Consultar médico | Alterar médico | Gerenciar acessos | Visão global | Solicitar apoio | Responder apoio |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | Administrador | Sim | Sim | Sim | Sim | Sim | Sim | Sim | Sim |
-| Gestor da Administração | Sim | Não | Não | Não | Não | Não | Sim | Sim |
+| Gestor da Administração | Sim | Não | Não | Não | Não | Sim | Não | Não |
 | Operador Administrativo | Sim | Sim | Não | Não | Não | Não | Não | Não |
-| Médico do Trabalho | Sim | Não | Sim | Sim | Não | Não | Não | Não |
-| Médico Perito | Sim | Não | Sim | Sim | Não | Não | Não | Não |
-| Auditor | Sim | Não | Não | Não | Não | Sim | Não | Não |
+| Médico | Sim | Não | Sim | Sim | Não | Não | Sim | Não |
+| Enfermagem | Sim | Não | Sim | Não | Não | Não | Não | Não |
+| Neuropsicólogo | Não* | Não* | Não* | Não | Não | Não | Não | Sim |
+| Assistente Social | Não* | Não* | Não* | Não | Não | Não | Não | Sim |
+| Segurança do Trabalho | Não* | Não* | Não* | Não | Não | Não | Não | Sim |
+
+\* Os três perfis de apoio não têm consulta geral ao cadastro — menor
+privilégio. Eles só enxergam um servidor específico depois de receber uma
+solicitação de apoio endereçada à sua especialidade (`responder_solicitacao_apoio`),
+e a resposta que registram passa a integrar o histórico clínico do servidor,
+visível a quem tem `consultar_conteudo_medico`.
 
 O superusuário do Django é uma conta técnica e não representa um perfil de
 negócio.
+
+O perfil `Auditor` foi removido: não havia nenhuma tela ou API de auditoria
+construída ainda para justificá-lo, e a permissão `visualizar_auditoria` foi
+removida junto. Quando a trilha de auditoria (Marco 7) for priorizada, um
+perfil dedicado pode voltar a ser criado com as permissões que fizerem
+sentido na hora.
+
+A Visão Geral (painel de indicadores) não depende mais de uma permissão
+específica: os números que ela mostra são agregados e não identificam nenhum
+servidor, então qualquer perfil autenticado a vê, escopada pela própria
+unidade (visão global só para quem tem `visualizar_dados_globais`).
 
 ## Permissões de negócio
 
@@ -40,9 +66,9 @@ negócio.
 | `contas.alterar_dados_administrativos` | Alterações administrativas |
 | `contas.consultar_conteudo_medico` | Visualização de conteúdo médico |
 | `contas.alterar_conteudo_medico` | Criação e alteração de conteúdo médico |
-| `contas.visualizar_auditoria` | Consulta à trilha de auditoria |
 | `contas.visualizar_dados_globais` | Consulta dos dados de todas as unidades |
-| `contas.visualizar_indicadores_gerenciais` | Acesso aos painéis gerenciais |
+| `contas.solicitar_apoio_especializado` | Solicitar apoio de Neuropsicólogo, Assistente Social ou Segurança do Trabalho |
+| `contas.responder_solicitacao_apoio` | Responder solicitações de apoio direcionadas à própria especialidade |
 
 As rotas verificam a permissão específica no backend. Ocultar um botão no
 frontend não substitui autorização. A permissão `gerenciar_acessos` permanece

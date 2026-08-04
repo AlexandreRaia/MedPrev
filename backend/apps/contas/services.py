@@ -70,9 +70,7 @@ def _garantir_outro_administrador(usuario: Usuario) -> None:
 
 def _validar_alvo_tecnico(*, ator: Usuario, usuario: Usuario) -> None:
     if usuario.is_superuser and not ator.is_superuser:
-        raise ValidationError(
-            "Somente outro superusuário pode alterar uma conta técnica."
-        )
+        raise ValidationError("Somente outro superusuário pode alterar uma conta técnica.")
 
 
 @transaction.atomic
@@ -173,11 +171,7 @@ def alterar_status_usuario(
     _registrar_evento_acesso(
         ator=ator,
         usuario_alvo=usuario,
-        acao=(
-            EventoAcesso.Acao.USUARIO_ATIVADO
-            if ativo
-            else EventoAcesso.Acao.USUARIO_DESATIVADO
-        ),
+        acao=(EventoAcesso.Acao.USUARIO_ATIVADO if ativo else EventoAcesso.Acao.USUARIO_DESATIVADO),
     )
     return usuario
 
@@ -233,9 +227,7 @@ def atualizar_permissoes_perfil(
     if perfil not in PERFIS_E_PERMISSOES:
         raise ValidationError("O perfil informado não é válido.")
 
-    permissoes_validas = {
-        codename for codename, _ in Usuario._meta.permissions
-    }
+    permissoes_validas = {codename for codename, _ in Usuario._meta.permissions}
     novas_permissoes = set(permissoes)
     desconhecidas = novas_permissoes - permissoes_validas
     if desconhecidas:
@@ -261,9 +253,7 @@ def atualizar_permissoes_perfil(
         raise ValidationError("Uma ou mais permissões não estão disponíveis.")
     grupo.permissions.set(permissoes_do_banco)
     ordenadas = [
-        codename
-        for codename, _ in Usuario._meta.permissions
-        if codename in novas_permissoes
+        codename for codename, _ in Usuario._meta.permissions if codename in novas_permissoes
     ]
     _registrar_evento_acesso(
         ator=ator,

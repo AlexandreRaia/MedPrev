@@ -106,9 +106,7 @@ def _serializar_unidade(unidade: Unidade) -> UnidadeSaida:
         tipo_descricao=unidade.get_tipo_display(),
         ativa=unidade.ativa,
         usuarios_vinculados=(
-            usuarios_vinculados
-            if usuarios_vinculados is not None
-            else unidade.usuarios.count()
+            usuarios_vinculados if usuarios_vinculados is not None else unidade.usuarios.count()
         ),
         usuarios_ativos=(
             usuarios_ativos
@@ -125,8 +123,7 @@ def _serializar_usuario(usuario: Usuario) -> UsuarioAdministrativoSaida:
         nome=usuario.get_full_name() or usuario.username,
         email=usuario.email,
         ativo=usuario.is_active,
-        perfil=usuario.groups.order_by("name").values_list("name", flat=True).first()
-        or "",
+        perfil=usuario.groups.order_by("name").values_list("name", flat=True).first() or "",
         unidade=_serializar_unidade(usuario.unidade),
         deve_trocar_senha=usuario.deve_trocar_senha,
     )

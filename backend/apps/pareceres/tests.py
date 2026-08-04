@@ -6,6 +6,7 @@ from django.contrib.auth.models import Group
 from django.db import connection
 from django.test import Client, TestCase
 
+from apps.apoio.services import criar_solicitacao
 from apps.contas.models import Unidade
 from apps.legado.models import Pericia, ProtocoloCid, Servidor
 from apps.pareceres.models import EventoParecer
@@ -49,24 +50,24 @@ class ApiDePareceresTests(TestCase):
         self.medico = usuario_model.objects.create_user(
             username="medico.um", password="Senha-ficticia-123", unidade=unidade
         )
-        self.medico.groups.add(Group.objects.get(name="Médico do Trabalho"))
+        self.medico.groups.add(Group.objects.get(name="Médico"))
 
         self.outro_medico = usuario_model.objects.create_user(
             username="medico.dois", password="Senha-ficticia-123", unidade=unidade
         )
-        self.outro_medico.groups.add(Group.objects.get(name="Médico do Trabalho"))
+        self.outro_medico.groups.add(Group.objects.get(name="Médico"))
 
-        self.auditor = usuario_model.objects.create_user(
-            username="auditor.um", password="Senha-ficticia-123"
+        self.enfermagem = usuario_model.objects.create_user(
+            username="enfermagem.um", password="Senha-ficticia-123", unidade=unidade
         )
-        self.auditor.groups.add(Group.objects.get(name="Auditor"))
+        self.enfermagem.groups.add(Group.objects.get(name="Enfermagem"))
 
         self.cliente_medico = Client()
         self.cliente_medico.force_login(self.medico)
         self.cliente_outro_medico = Client()
         self.cliente_outro_medico.force_login(self.outro_medico)
-        self.cliente_auditor = Client()
-        self.cliente_auditor.force_login(self.auditor)
+        self.cliente_enfermagem = Client()
+        self.cliente_enfermagem.force_login(self.enfermagem)
 
     def _payload_criacao(self, **extra) -> dict:
         payload = {
@@ -89,7 +90,7 @@ class ApiDePareceresTests(TestCase):
         self.assertEqual(response.status_code, 401)
 
     def test_recusa_criacao_sem_permissao_de_alterar(self) -> None:
-        response = self._post(self.cliente_auditor, "/api/v1/pareceres", self._payload_criacao())
+        response = self._post(self.cliente_enfermagem, "/api/v1/pareceres", self._payload_criacao())
 
         self.assertEqual(response.status_code, 403)
 
@@ -304,7 +305,7 @@ class ApiDeIndicadoresTests(TestCase):
         self.medico = usuario_model.objects.create_user(
             username="medico.indicadores", password="Senha-ficticia-123", unidade=unidade
         )
-        self.medico.groups.add(Group.objects.get(name="Médico do Trabalho"))
+        self.medico.groups.add(Group.objects.get(name="Médico"))
         self.cliente_medico = Client()
         self.cliente_medico.force_login(self.medico)
 
@@ -324,10 +325,14 @@ class ApiDeIndicadoresTests(TestCase):
 
         self.assertEqual(response.status_code, 401)
 
-    def test_recusa_usuario_sem_a_permissao_de_indicadores(self) -> None:
+    def test_todo_usuario_autenticado_ve_os_indicadores(self) -> None:
+        """
+        Os números são agregados e não expõem nenhum servidor individualmente,
+        então a Visão Geral não depende mais de uma permissão gerencial.
+        """
         response = self.cliente_medico.get("/api/v1/indicadores")
 
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
 
     def test_retorna_indicadores_calculados_a_partir_de_dado_real(self) -> None:
         response = self.cliente_gestor.get("/api/v1/indicadores")
@@ -340,3 +345,51 @@ class ApiDeIndicadoresTests(TestCase):
         self.assertEqual(dados["pericias_com_atestado_60_dias"], 1)
         codigos = {grupo["codigo"] for grupo in dados["grupos_cid"]}
         self.assertEqual(codigos, {"M54.5", "Z00.0"})
+
+    def test_usuario_de_outra_unidade_nao_ve_pareceres_de_unidade_diferente(self) -> None:
+        outra_unidade = Unidade.objects.get(codigo="medicina-do-trabalho")
+        medico_de_outra_unidade = get_user_model().objects.create_user(
+            username="medico.outra.unidade",
+            password="Senha-ficticia-123",
+            unidade=outra_unidade,
+        )
+        medico_de_outra_unidade.groups.add(Group.objects.get(name="Médico"))
+        cliente = Client()
+        cliente.force_login(medico_de_outra_unidade)
+
+        response = cliente.get("/api/v1/indicadores")
+
+        self.assertEqual(response.status_code, 200)
+        dados = response.json()
+        self.assertEqual(dados["servidores_acompanhados"], 0)
+        self.assertEqual(dados["pareceres_em_rascunho"], 0)
+        # As métricas de perícia/CID não têm unidade do MedPrev associada no
+        # schema atual e continuam agregadas em todo o legado.
+        self.assertEqual(dados["pericias_60_dias"], 2)
+
+    def test_pendencias_de_apoio_por_perfil(self) -> None:
+        seguranca = get_user_model().objects.create_user(
+            username="seguranca.indicadores",
+            password="Senha-ficticia-123",
+            unidade=self.medico.unidade,
+        )
+        seguranca.groups.add(Group.objects.get(name="Segurança do Trabalho"))
+        cliente_seguranca = Client()
+        cliente_seguranca.force_login(seguranca)
+
+        criar_solicitacao(
+            ator=self.medico,
+            servidor_sismed_id=1001,
+            protocolo_sismed_id=None,
+            especialidade="seguranca_trabalho",
+            texto_solicitacao="Avaliar posto de trabalho.",
+        )
+
+        resposta_medico = self.cliente_medico.get("/api/v1/indicadores").json()
+        resposta_seguranca = cliente_seguranca.get("/api/v1/indicadores").json()
+        resposta_gestor = self.cliente_gestor.get("/api/v1/indicadores").json()
+
+        self.assertEqual(resposta_medico["minhas_solicitacoes_pendentes"], 1)
+        self.assertEqual(resposta_seguranca["minhas_solicitacoes_pendentes"], 1)
+        self.assertIsNone(resposta_gestor["minhas_solicitacoes_pendentes"])
+        self.assertEqual(resposta_gestor["solicitacoes_apoio_abertas"], 1)

@@ -574,6 +574,23 @@ p {
   background: #f0e9fa;
 }
 
+.cartao-indicador--clicavel {
+  width: 100%;
+  border: 1px solid var(--line);
+  outline: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cartao-indicador--clicavel:hover:not(:disabled) {
+  border-color: var(--amber);
+}
+
+.cartao-indicador--clicavel:disabled {
+  cursor: default;
+}
+
 .painel {
   margin-top: 1.2rem;
   border: 1px solid var(--line);
@@ -1198,7 +1215,8 @@ tbody tr:last-child td {
   font-weight: 700;
 }
 
-.formulario-parecer {
+.formulario-parecer,
+.formulario-solicitacao-apoio {
   display: grid;
   padding: 0.9rem;
   gap: 0.7rem;
@@ -1207,7 +1225,8 @@ tbody tr:last-child td {
   background: white;
 }
 
-.formulario-parecer label {
+.formulario-parecer label,
+.formulario-solicitacao-apoio label {
   display: grid;
   gap: 0.35rem;
   color: var(--muted);
@@ -1217,7 +1236,9 @@ tbody tr:last-child td {
 
 .formulario-parecer textarea,
 .formulario-parecer select,
-.formulario-parecer input[type="date"] {
+.formulario-parecer input[type="date"],
+.formulario-solicitacao-apoio textarea,
+.formulario-solicitacao-apoio select {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 7px;
@@ -1227,9 +1248,73 @@ tbody tr:last-child td {
   font: inherit;
 }
 
-.formulario-parecer textarea {
+.formulario-parecer textarea,
+.formulario-solicitacao-apoio textarea {
   resize: vertical;
   line-height: 1.5;
+}
+
+.secao-apoio {
+  margin-top: 1.1rem;
+}
+
+.secao-apoio h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+}
+
+.lista-solicitacoes-apoio {
+  display: grid;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+  gap: 0.6rem;
+}
+
+.lista-solicitacoes-apoio li {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.lista-solicitacoes-apoio__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.lista-solicitacoes-apoio__texto {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.lista-solicitacoes-apoio__resposta {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed var(--line);
+}
+
+.lista-solicitacoes-apoio__resposta span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.lista-solicitacoes-apoio__resposta p {
+  margin: 0.2rem 0 0;
+  color: var(--text);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 
 .linha-checagem {

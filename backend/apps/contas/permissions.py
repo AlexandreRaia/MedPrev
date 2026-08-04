@@ -3,9 +3,9 @@ CONSULTAR_DADOS = "consultar_dados"
 ALTERAR_DADOS_ADMINISTRATIVOS = "alterar_dados_administrativos"
 CONSULTAR_CONTEUDO_MEDICO = "consultar_conteudo_medico"
 ALTERAR_CONTEUDO_MEDICO = "alterar_conteudo_medico"
-VISUALIZAR_AUDITORIA = "visualizar_auditoria"
 VISUALIZAR_DADOS_GLOBAIS = "visualizar_dados_globais"
-VISUALIZAR_INDICADORES_GERENCIAIS = "visualizar_indicadores_gerenciais"
+SOLICITAR_APOIO_ESPECIALIZADO = "solicitar_apoio_especializado"
+RESPONDER_SOLICITACAO_APOIO = "responder_solicitacao_apoio"
 
 PERMISSOES_DE_NEGOCIO = (
     (GERENCIAR_ACESSOS, "Pode gerenciar usuários, grupos e permissões"),
@@ -16,14 +16,18 @@ PERMISSOES_DE_NEGOCIO = (
     ),
     (CONSULTAR_CONTEUDO_MEDICO, "Pode consultar conteúdo médico"),
     (ALTERAR_CONTEUDO_MEDICO, "Pode criar e alterar conteúdo médico"),
-    (VISUALIZAR_AUDITORIA, "Pode visualizar a auditoria"),
     (
         VISUALIZAR_DADOS_GLOBAIS,
         "Pode visualizar dados de todas as unidades",
     ),
     (
-        VISUALIZAR_INDICADORES_GERENCIAIS,
-        "Pode visualizar indicadores gerenciais",
+        SOLICITAR_APOIO_ESPECIALIZADO,
+        "Pode solicitar apoio de especialista (Neuropsicólogo, Assistente "
+        "Social, Segurança do Trabalho)",
+    ),
+    (
+        RESPONDER_SOLICITACAO_APOIO,
+        "Pode responder solicitações de apoio direcionadas à sua especialidade",
     ),
 )
 
@@ -32,26 +36,24 @@ PERFIS_E_PERMISSOES = {
     "Gestor da Administração": (
         CONSULTAR_DADOS,
         VISUALIZAR_DADOS_GLOBAIS,
-        VISUALIZAR_INDICADORES_GERENCIAIS,
     ),
     "Operador Administrativo": (
         CONSULTAR_DADOS,
         ALTERAR_DADOS_ADMINISTRATIVOS,
     ),
-    "Médico do Trabalho": (
+    "Médico": (
         CONSULTAR_DADOS,
         CONSULTAR_CONTEUDO_MEDICO,
         ALTERAR_CONTEUDO_MEDICO,
+        SOLICITAR_APOIO_ESPECIALIZADO,
     ),
-    "Médico Perito": (
+    "Enfermagem": (
         CONSULTAR_DADOS,
         CONSULTAR_CONTEUDO_MEDICO,
-        ALTERAR_CONTEUDO_MEDICO,
     ),
-    "Auditor": (
-        CONSULTAR_DADOS,
-        VISUALIZAR_AUDITORIA,
-    ),
+    "Neuropsicólogo": (RESPONDER_SOLICITACAO_APOIO,),
+    "Assistente Social": (RESPONDER_SOLICITACAO_APOIO,),
+    "Segurança do Trabalho": (RESPONDER_SOLICITACAO_APOIO,),
 }
 
 

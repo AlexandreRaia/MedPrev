@@ -5,6 +5,10 @@ import { Servidores } from "./Servidores";
 
 const permissoesSemAlterar = ["consultar_dados", "consultar_conteudo_medico"];
 const permissoesComAlterar = [...permissoesSemAlterar, "alterar_conteudo_medico"];
+const permissoesComApoio = [
+  ...permissoesSemAlterar,
+  "solicitar_apoio_especializado",
+];
 const usuarioIdPadrao = 1;
 
 function diasAtras(dias: number): string {
@@ -236,6 +240,7 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
       .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock);
@@ -279,7 +284,8 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
-      .mockResolvedValueOnce(resposta(200, [parecerConcluido]));
+      .mockResolvedValueOnce(resposta(200, [parecerConcluido]))
+      .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock, permissoesSemAlterar);
 
@@ -293,6 +299,7 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
       .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock, permissoesComAlterar);
@@ -309,7 +316,8 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
-      .mockResolvedValueOnce(resposta(200, [parecerConcluido]));
+      .mockResolvedValueOnce(resposta(200, [parecerConcluido]))
+      .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock, permissoesComAlterar);
 
@@ -322,6 +330,7 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
       .mockResolvedValueOnce(resposta(200, []))
       .mockResolvedValueOnce(resposta(200, { csrf_token: "csrf-teste" }))
       .mockResolvedValueOnce(resposta(201, parecerConcluido))
@@ -345,5 +354,122 @@ describe("Servidores", () => {
     const corpo = JSON.parse(opcoesDaChamada?.body ?? "{}");
     expect(corpo.servidor_sismed_id).toBe(1001);
     expect(corpo.concluir).toBe(false);
+  });
+
+  it("mostra as solicitações de apoio e a resposta do especialista", async () => {
+    const solicitacaoRespondida = {
+      id: 9,
+      servidor_sismed_id: 1001,
+      protocolo_sismed_id: null,
+      especialidade: "seguranca_trabalho",
+      especialidade_descricao: "Segurança do Trabalho",
+      solicitante: "Ana Souza",
+      solicitante_id: 2,
+      unidade: "Medicina do Trabalho",
+      texto_solicitacao: "Avaliar posto de trabalho.",
+      estado: "respondida",
+      estado_descricao: "Respondida",
+      respondente: "Carlos Lima",
+      texto_resposta: "Posto avaliado, sem risco relevante.",
+      criado_em: "2026-07-01T10:00:00Z",
+      respondido_em: "2026-07-02T10:00:00Z",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
+      .mockResolvedValueOnce(resposta(200, [solicitacaoRespondida]));
+
+    await abrirModal(fetchMock, permissoesSemAlterar);
+
+    expect(await screen.findByText("Avaliar posto de trabalho.")).toBeInTheDocument();
+    expect(screen.getByText("Carlos Lima respondeu")).toBeInTheDocument();
+    expect(
+      screen.getByText("Posto avaliado, sem risco relevante."),
+    ).toBeInTheDocument();
+  });
+
+  it("não mostra o formulário de solicitar apoio para quem não tem a permissão", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
+      .mockResolvedValueOnce(resposta(200, []));
+
+    await abrirModal(fetchMock, permissoesSemAlterar);
+
+    await screen.findByText("Nenhuma solicitação de apoio registrada.");
+    expect(screen.queryByText("Solicitar apoio")).not.toBeInTheDocument();
+  });
+
+  it("envia uma nova solicitação de apoio", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
+      .mockResolvedValueOnce(resposta(200, []))
+      .mockResolvedValueOnce(resposta(200, []))
+      .mockResolvedValueOnce(resposta(200, { csrf_token: "csrf-teste" }))
+      .mockResolvedValueOnce(
+        resposta(201, {
+          id: 10,
+          servidor_sismed_id: 1001,
+          protocolo_sismed_id: null,
+          especialidade: "assistencia_social",
+          especialidade_descricao: "Assistente Social",
+          solicitante: "Ana Souza",
+          solicitante_id: 2,
+          unidade: "Medicina do Trabalho",
+          texto_solicitacao: "Avaliar situação socioeconômica.",
+          estado: "aberta",
+          respondente: null,
+          texto_resposta: "",
+          criado_em: "2026-07-03T10:00:00Z",
+          respondido_em: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        resposta(200, [
+          {
+            id: 10,
+            servidor_sismed_id: 1001,
+            protocolo_sismed_id: null,
+            especialidade: "assistencia_social",
+            especialidade_descricao: "Assistente Social",
+            solicitante: "Ana Souza",
+            solicitante_id: 2,
+            unidade: "Medicina do Trabalho",
+            texto_solicitacao: "Avaliar situação socioeconômica.",
+            estado: "aberta",
+            estado_descricao: "Aguardando resposta",
+            respondente: null,
+            texto_resposta: "",
+            criado_em: "2026-07-03T10:00:00Z",
+            respondido_em: null,
+          },
+        ]),
+      );
+
+    await abrirModal(fetchMock, permissoesComApoio);
+
+    await screen.findByText("Nenhuma solicitação de apoio registrada.");
+    fireEvent.change(screen.getByLabelText("Especialidade"), {
+      target: { value: "assistencia_social" },
+    });
+    fireEvent.change(
+      screen.getByPlaceholderText("Descreva o que precisa ser avaliado…"),
+      { target: { value: "Avaliar situação socioeconômica." } },
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Enviar solicitação" }));
+
+    expect(
+      await screen.findByText("Avaliar situação socioeconômica."),
+    ).toBeInTheDocument();
+    const chamadaDeCriacao = fetchMock.mock.calls.find(
+      (chamada: unknown[]) => chamada[0] === "/api/v1/apoio",
+    );
+    expect(chamadaDeCriacao).toBeDefined();
   });
 });

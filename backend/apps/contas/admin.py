@@ -10,9 +10,7 @@ class UsuarioAdmin(UserAdmin):
 
     list_display = ("username", "email", "unidade", "is_active", "is_staff")
     list_filter = ("unidade", "is_active", "groups")
-    fieldsets = UserAdmin.fieldsets + (
-        ("MedPrev", {"fields": ("unidade", "deve_trocar_senha")}),
-    )
+    fieldsets = UserAdmin.fieldsets + (("MedPrev", {"fields": ("unidade", "deve_trocar_senha")}),)
     add_fieldsets = UserAdmin.add_fieldsets + (
         ("MedPrev", {"fields": ("unidade", "deve_trocar_senha")}),
     )

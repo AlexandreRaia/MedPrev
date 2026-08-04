@@ -4,6 +4,7 @@ import {
   Administracao,
   SecaoAdministrativa,
 } from "../features/administracao/Administracao";
+import { Atendimentos } from "../features/atendimentos/Atendimentos";
 import {
   consultarSessao,
   sair,
@@ -25,7 +26,12 @@ type EstadoSessao =
   | { tipo: "autenticado"; usuario: UsuarioSessao }
   | { tipo: "erro" };
 
-type Tela = "inicio" | "servidores" | "ferramentas" | SecaoAdministrativa;
+type Tela =
+  | "inicio"
+  | "servidores"
+  | "atendimentos"
+  | "ferramentas"
+  | SecaoAdministrativa;
 
 export function App() {
   const [estado, setEstado] = useState<EstadoSessao>({ tipo: "carregando" });
@@ -129,9 +135,13 @@ function Aplicacao({
 }) {
   const [tela, setTela] = useState<Tela>("inicio");
   const podeAdministrar = usuario.permissoes.includes("gerenciar_acessos");
-  const podeVerIndicadores = usuario.permissoes.includes(
-    "visualizar_indicadores_gerenciais",
+  const podeResponderApoio = usuario.permissoes.includes(
+    "responder_solicitacao_apoio",
   );
+  const podeSolicitarApoio = usuario.permissoes.includes(
+    "solicitar_apoio_especializado",
+  );
+  const podeAbrirAtendimentos = podeResponderApoio || podeSolicitarApoio;
   const perfil = usuario.grupos[0] ?? "Sem perfil atribuído";
 
   return (
@@ -180,10 +190,13 @@ function Aplicacao({
               aoClicar={() => setTela("servidores")}
             />
             <BotaoNavegacao
-              ativo={false}
+              ativo={tela === "atendimentos"}
               icone="▤"
               texto="Atendimentos"
-              desabilitado
+              aoClicar={
+                podeAbrirAtendimentos ? () => setTela("atendimentos") : undefined
+              }
+              desabilitado={!podeAbrirAtendimentos}
             />
             <BotaoNavegacao
               ativo={tela === "ferramentas"}
@@ -229,13 +242,17 @@ function Aplicacao({
             </p>
           ) : null}
           {tela === "inicio" ? (
-            podeVerIndicadores ? (
-              <PainelIndicadores nomeUsuario={usuario.nome} />
-            ) : (
-              <PainelInicial usuario={usuario} perfil={perfil} />
-            )
+            <PainelIndicadores
+              nomeUsuario={usuario.nome}
+              permissoes={usuario.permissoes}
+              aoAbrirAtendimentos={
+                podeAbrirAtendimentos ? () => setTela("atendimentos") : undefined
+              }
+            />
           ) : tela === "servidores" ? (
             <Servidores permissoes={usuario.permissoes} usuarioId={usuario.id} />
+          ) : tela === "atendimentos" ? (
+            <Atendimentos permissoes={usuario.permissoes} usuarioId={usuario.id} />
           ) : tela === "ferramentas" ? (
             <Ferramentas />
           ) : podeAdministrar ? (
@@ -275,106 +292,6 @@ function BotaoNavegacao({
       {texto}
       {desabilitado ? <small>Em breve</small> : null}
     </button>
-  );
-}
-
-function PainelInicial({
-  usuario,
-  perfil,
-}: {
-  usuario: UsuarioSessao;
-  perfil: string;
-}) {
-  return (
-    <>
-      <header className="cabecalho-secao">
-        <div>
-          <p className="sobretitulo">Painel principal</p>
-          <h1>Olá, {usuario.nome}</h1>
-          <p>
-            Esta é a visão inicial da sua unidade. Os próximos indicadores serão
-            conectados aos fluxos do MVP.
-          </p>
-        </div>
-        <span className="data-atual">
-          Unidade: <strong>{usuario.unidade.nome}</strong>
-        </span>
-      </header>
-      <section className="grade-indicadores" aria-label="Resumo do acesso">
-        <CartaoIndicador
-          tom="azul"
-          icone="◎"
-          valor={perfil}
-          rotulo="Perfil de acesso"
-          detalhe="Autorizações validadas pela API"
-        />
-        <CartaoIndicador
-          tom="verde"
-          icone="✓"
-          valor={String(usuario.permissoes.length)}
-          rotulo="Permissões ativas"
-          detalhe="Aplicadas nesta sessão"
-        />
-        <CartaoIndicador
-          tom="amarelo"
-          icone="◷"
-          valor="0"
-          rotulo="Pendências"
-          detalhe="Módulo operacional em preparação"
-        />
-        <CartaoIndicador
-          tom="roxo"
-          icone="▦"
-          valor={usuario.unidade.nome}
-          rotulo="Escopo de dados"
-          detalhe={
-            usuario.permissoes.includes("visualizar_dados_globais")
-              ? "Visão global autorizada"
-              : "Restrito à unidade vinculada"
-          }
-        />
-      </section>
-      <section className="painel painel--boas-vindas">
-        <div>
-          <p className="sobretitulo">Próxima etapa</p>
-          <h2>Cadastro e consulta de servidores</h2>
-          <p>
-            A fundação de autenticação, unidades e controle de acesso está
-            pronta para receber o primeiro fluxo operacional.
-          </p>
-        </div>
-        <div className="painel--boas-vindas__selo" aria-hidden="true">
-          MVP
-        </div>
-      </section>
-    </>
-  );
-}
-
-function CartaoIndicador({
-  tom,
-  icone,
-  valor,
-  rotulo,
-  detalhe,
-}: {
-  tom: string;
-  icone: string;
-  valor: string;
-  rotulo: string;
-  detalhe: string;
-}) {
-  return (
-    <article className={`cartao-indicador cartao-indicador--${tom}`}>
-      <span className="cartao-indicador__icone" aria-hidden="true">
-        {icone}
-      </span>
-      <div>
-        <strong>{valor}</strong>
-        <h2>{rotulo}</h2>
-        <p>{detalhe}</p>
-      </div>
-    </article>
   );
 }
 
