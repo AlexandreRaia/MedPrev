@@ -46,6 +46,72 @@ function agruparPorCid(pericias: PericiaResumo[]): GrupoCid[] {
   return [...mapa.values()].sort((a, b) => b.dias - a.dias);
 }
 
+function severidadeCid(dias: number): "baixo" | "medio" | "alto" {
+  if (dias >= 15) return "alto";
+  if (dias >= 10) return "medio";
+  return "baixo";
+}
+
+type EventoLinhaDoTempo = {
+  id: string;
+  data: string;
+  tipo: "atestado" | "consulta" | "parecer" | "apoio";
+  tag: string;
+  cid: string | null;
+  titulo: string;
+  subtitulo: string;
+};
+
+function montarLinhaDoTempo(
+  pericias: PericiaResumo[],
+  pareceres: Parecer[],
+  solicitacoes: SolicitacaoApoio[],
+): EventoLinhaDoTempo[] {
+  const eventosDePericias: EventoLinhaDoTempo[] = pericias.map((pericia) => ({
+    id: `pericia-${pericia.id}`,
+    data: pericia.data ?? "",
+    tipo: pericia.atestado ? "atestado" : "consulta",
+    tag: pericia.atestado ? "Atestado" : "Consulta",
+    cid: pericia.cids[0] ?? null,
+    titulo: pericia.motivo ?? "Perícia médica",
+    subtitulo: pericia.atestado
+      ? `Atestado · ${pericia.dias_atestado ?? "?"} dia(s)`
+      : (pericia.conduta ??
+        pericia.subjetivo ??
+        pericia.objetivo ??
+        pericia.relatorio ??
+        "Sem detalhes adicionais"),
+  }));
+
+  const eventosDePareceres: EventoLinhaDoTempo[] = pareceres
+    .filter((parecer) => parecer.estado === "concluido")
+    .map((parecer) => ({
+      id: `parecer-${parecer.id}`,
+      data: (parecer.concluido_em ?? parecer.criado_em).slice(0, 10),
+      tipo: "parecer",
+      tag: "Parecer",
+      cid: null,
+      titulo: parecer.conclusao_descricao,
+      subtitulo: `${parecer.autor}: ${parecer.texto}`,
+    }));
+
+  const eventosDeApoio: EventoLinhaDoTempo[] = solicitacoes
+    .filter((solicitacao) => solicitacao.estado === "respondida")
+    .map((solicitacao) => ({
+      id: `apoio-${solicitacao.id}`,
+      data: (solicitacao.respondido_em ?? solicitacao.criado_em).slice(0, 10),
+      tipo: "apoio",
+      tag: solicitacao.especialidade_descricao,
+      cid: null,
+      titulo: `Apoio de ${solicitacao.especialidade_descricao} · solicitado por ${solicitacao.solicitante}`,
+      subtitulo: `${solicitacao.respondente ?? "—"} respondeu: ${solicitacao.texto_resposta}`,
+    }));
+
+  return [...eventosDePericias, ...eventosDePareceres, ...eventosDeApoio].sort((a, b) =>
+    a.data < b.data ? 1 : a.data > b.data ? -1 : 0,
+  );
+}
+
 export function Servidores({
   permissoes,
   usuarioId,
@@ -230,6 +296,27 @@ export function DetalheServidorModal({
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [aba, setAba] = useState<"linha" | "grafico">("linha");
+  const [linhaExpandida, setLinhaExpandida] = useState<Set<string>>(new Set());
+
+  function alternarLinhaExpandida(eventoId: string) {
+    setLinhaExpandida((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(eventoId)) {
+        novo.delete(eventoId);
+      } else {
+        novo.add(eventoId);
+      }
+      return novo;
+    });
+  }
+
+  const [pareceres, setPareceres] = useState<Parecer[]>([]);
+  const [carregandoPareceres, setCarregandoPareceres] = useState(true);
+  const [erroPareceres, setErroPareceres] = useState<string | null>(null);
+
+  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoApoio[]>([]);
+  const [carregandoSolicitacoes, setCarregandoSolicitacoes] = useState(true);
+  const [erroSolicitacoes, setErroSolicitacoes] = useState<string | null>(null);
 
   useEffect(() => {
     const controlador = new AbortController();
@@ -245,9 +332,71 @@ export function DetalheServidorModal({
     return () => controlador.abort();
   }, [servidorId]);
 
+  const podeVerConteudoMedico = detalhe?.historico_medico_visivel ?? false;
+
+  function recarregarPareceres() {
+    setCarregandoPareceres(true);
+    listarPareceres(servidorId)
+      .then((resultado) => {
+        setPareceres(resultado);
+        setErroPareceres(null);
+      })
+      .catch((error: unknown) => setErroPareceres(mensagemDoErro(error)))
+      .finally(() => setCarregandoPareceres(false));
+  }
+
+  function recarregarSolicitacoes() {
+    setCarregandoSolicitacoes(true);
+    listarSolicitacoesDoServidor(servidorId)
+      .then((resultado) => {
+        setSolicitacoes(resultado);
+        setErroSolicitacoes(null);
+      })
+      .catch((error: unknown) => setErroSolicitacoes(mensagemDoErro(error)))
+      .finally(() => setCarregandoSolicitacoes(false));
+  }
+
+  useEffect(() => {
+    if (!podeVerConteudoMedico) return;
+    let ativo = true;
+    listarPareceres(servidorId)
+      .then((resultado) => {
+        if (!ativo) return;
+        setPareceres(resultado);
+        setErroPareceres(null);
+      })
+      .catch((error: unknown) => {
+        if (ativo) setErroPareceres(mensagemDoErro(error));
+      })
+      .finally(() => {
+        if (ativo) setCarregandoPareceres(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [servidorId, podeVerConteudoMedico]);
+
+  useEffect(() => {
+    if (!podeVerConteudoMedico) return;
+    let ativo = true;
+    listarSolicitacoesDoServidor(servidorId)
+      .then((resultado) => {
+        if (!ativo) return;
+        setSolicitacoes(resultado);
+        setErroSolicitacoes(null);
+      })
+      .catch((error: unknown) => {
+        if (ativo) setErroSolicitacoes(mensagemDoErro(error));
+      })
+      .finally(() => {
+        if (ativo) setCarregandoSolicitacoes(false);
+      });
+    return () => {
+      ativo = false;
+    };
+  }, [servidorId, podeVerConteudoMedico]);
+
   const nomeExibido = detalhe?.nome_social ?? detalhe?.nome ?? "Servidor";
-  const gruposCid = agruparPorCid(detalhe?.pericias ?? []);
-  const maiorDiasPorCid = Math.max(1, ...gruposCid.map((grupo) => grupo.dias));
 
   const protocolosUltimos60Dias = (detalhe?.protocolos ?? []).filter((protocolo) =>
     dentroDosUltimos60Dias(protocolo.data),
@@ -258,6 +407,15 @@ export function DetalheServidorModal({
   const diasDeAtestado60Dias = periciasUltimos60Dias.reduce(
     (total, pericia) => total + (pericia.atestado ? (pericia.dias_atestado ?? 0) : 0),
     0,
+  );
+
+  const gruposCid = agruparPorCid(periciasUltimos60Dias);
+  const maiorDiasPorCid = Math.max(1, ...gruposCid.map((grupo) => grupo.dias));
+
+  const eventosLinhaDoTempo = montarLinhaDoTempo(
+    detalhe?.pericias ?? [],
+    pareceres,
+    solicitacoes,
   );
 
   return (
@@ -307,6 +465,10 @@ export function DetalheServidorModal({
                   servidorSismedId={detalhe.id}
                   permissoes={permissoes}
                   usuarioId={usuarioId}
+                  pareceres={pareceres}
+                  carregando={carregandoPareceres}
+                  erro={erroPareceres}
+                  recarregar={recarregarPareceres}
                 />
               </aside>
             ) : null}
@@ -377,13 +539,16 @@ export function DetalheServidorModal({
                     <span aria-hidden="true">!</span>
                     <div>
                       <h3>Grupos de CID em atenção</h3>
-                      <p>Dias de atestado acumulados por código</p>
+                      <p>Dias de atestado acumulados por código · últimos 60 dias</p>
                     </div>
                     <span className="etiqueta-alerta">{gruposCid.length} alerta(s)</span>
                   </div>
                   <div className="alerta-cid__grupos">
                     {gruposCid.map((grupo) => (
-                      <article className="alerta-cid__grupo" key={grupo.codigo}>
+                      <article
+                        className={`alerta-cid__grupo alerta-cid__grupo--${severidadeCid(grupo.dias)}`}
+                        key={grupo.codigo}
+                      >
                         <b>{grupo.codigo}</b>
                         <strong>
                           {grupo.dias}
@@ -395,7 +560,7 @@ export function DetalheServidorModal({
                 </div>
               ) : null}
 
-              {detalhe.historico_medico_visivel && detalhe.pericias.length > 0 ? (
+              {detalhe.historico_medico_visivel && eventosLinhaDoTempo.length > 0 ? (
                 <>
                   <div className="abas-modal">
                     <button
@@ -403,7 +568,7 @@ export function DetalheServidorModal({
                       className={aba === "linha" ? "ativo" : ""}
                       onClick={() => setAba("linha")}
                     >
-                      Linha do tempo <span>{detalhe.pericias.length}</span>
+                      Linha do tempo <span>{eventosLinhaDoTempo.length}</span>
                     </button>
                     <button
                       type="button"
@@ -416,38 +581,39 @@ export function DetalheServidorModal({
 
                   {aba === "linha" ? (
                     <ol className="linha-do-tempo">
-                      {detalhe.pericias.map((pericia) => {
-                        const subtitulo = pericia.atestado
-                          ? `Atestado · ${pericia.dias_atestado ?? "?"} dia(s)`
-                          : (pericia.conduta ??
-                            pericia.subjetivo ??
-                            pericia.objetivo ??
-                            pericia.relatorio ??
-                            "Sem detalhes adicionais");
+                      {eventosLinhaDoTempo.map((evento) => {
+                        const expandido = linhaExpandida.has(evento.id);
                         return (
-                          <li key={pericia.id}>
+                        <li key={evento.id}>
+                          <button
+                            type="button"
+                            className={`linha-do-tempo__marca${evento.tipo !== "consulta" ? ` linha-do-tempo__marca--${evento.tipo}` : ""}`}
+                            onClick={() => alternarLinhaExpandida(evento.id)}
+                            aria-expanded={expandido}
+                            aria-label={expandido ? "Recolher detalhes" : "Expandir detalhes"}
+                          >
+                            {expandido ? "−" : "+"}
+                          </button>
+                          <time>{formatarData(evento.data)}</time>
+                          <div className="linha-do-tempo__conteudo">
                             <span
-                              className={`linha-do-tempo__marca${pericia.atestado ? " linha-do-tempo__marca--atestado" : ""}`}
-                              aria-hidden="true"
-                            />
-                            <time>{formatarData(pericia.data)}</time>
-                            <div className="linha-do-tempo__conteudo">
-                              <span
-                                className={`linha-do-tempo__tag${pericia.atestado ? " linha-do-tempo__tag--atestado" : ""}`}
-                              >
-                                {pericia.atestado ? "Atestado" : "Consulta"}
-                              </span>
-                              <h4>
-                                {pericia.cids[0] ? (
-                                  <>
-                                    <b>{pericia.cids[0]}</b> ·{" "}
-                                  </>
-                                ) : null}
-                                {pericia.motivo ?? "Perícia médica"}
-                              </h4>
-                              <p className="linha-do-tempo__subtitulo">{subtitulo}</p>
-                            </div>
-                          </li>
+                              className={`linha-do-tempo__tag${evento.tipo !== "consulta" ? ` linha-do-tempo__tag--${evento.tipo}` : ""}`}
+                            >
+                              {evento.tag}
+                            </span>
+                            <h4>
+                              {evento.cid ? (
+                                <>
+                                  <b>{evento.cid}</b> ·{" "}
+                                </>
+                              ) : null}
+                              {evento.titulo}
+                            </h4>
+                            {expandido ? (
+                              <p className="linha-do-tempo__subtitulo">{evento.subtitulo}</p>
+                            ) : null}
+                          </div>
+                        </li>
                         );
                       })}
                     </ol>
@@ -478,7 +644,14 @@ export function DetalheServidorModal({
 
             {detalhe.historico_medico_visivel ? (
               <aside className="prontuario-apoio">
-                <SecaoApoio servidorSismedId={detalhe.id} permissoes={permissoes} />
+                <SecaoApoio
+                  servidorSismedId={detalhe.id}
+                  permissoes={permissoes}
+                  solicitacoes={solicitacoes}
+                  carregando={carregandoSolicitacoes}
+                  erro={erroSolicitacoes}
+                  recarregar={recarregarSolicitacoes}
+                />
               </aside>
             ) : null}
           </div>
@@ -492,17 +665,23 @@ function SecaoParecer({
   servidorSismedId,
   permissoes,
   usuarioId,
+  pareceres,
+  carregando,
+  erro,
+  recarregar,
 }: {
   servidorSismedId: number;
   permissoes: string[];
   usuarioId: number;
+  pareceres: Parecer[];
+  carregando: boolean;
+  erro: string | null;
+  recarregar: () => void;
 }) {
-  const [pareceres, setPareceres] = useState<Parecer[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
   const [editando, setEditando] = useState<Parecer | null>(null);
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const podeAlterar = permissoes.includes("alterar_conteudo_medico");
+  const rascunhos = pareceres.filter((parecer) => parecer.estado === "rascunho");
 
   function alternarExpandido(parecerId: number) {
     setExpandidos((atual) => {
@@ -516,39 +695,10 @@ function SecaoParecer({
     });
   }
 
-  function recarregar() {
-    setCarregando(true);
-    listarPareceres(servidorSismedId)
-      .then((resultado) => {
-        setPareceres(resultado);
-        setErro(null);
-      })
-      .catch((error: unknown) => setErro(mensagemDoErro(error)))
-      .finally(() => setCarregando(false));
-  }
-
-  useEffect(() => {
-    let ativo = true;
-    listarPareceres(servidorSismedId)
-      .then((resultado) => {
-        if (!ativo) return;
-        setPareceres(resultado);
-        setErro(null);
-      })
-      .catch((error: unknown) => {
-        if (ativo) setErro(mensagemDoErro(error));
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [servidorSismedId]);
-
   return (
     <div className="secao-parecer">
-      <h3>Pareceres{pareceres.length > 0 ? ` · ${pareceres.length}` : ""}</h3>
+      <h3>Parecer em aberto{rascunhos.length > 0 ? ` · ${rascunhos.length}` : ""}</h3>
+      <p className="texto-secundario">Pareceres concluídos aparecem na linha do tempo.</p>
 
       {carregando ? (
         <div className="estado-painel" aria-live="polite">
@@ -563,13 +713,13 @@ function SecaoParecer({
         </p>
       ) : null}
 
-      {!carregando && !erro && pareceres.length === 0 ? (
-        <p className="texto-secundario">Nenhum parecer registrado.</p>
+      {!carregando && !erro && rascunhos.length === 0 ? (
+        <p className="texto-secundario">Nenhum parecer em aberto no momento.</p>
       ) : null}
 
-      {!carregando && pareceres.length > 0 ? (
+      {!carregando && rascunhos.length > 0 ? (
         <ul className="lista-pareceres">
-          {pareceres.map((parecer) => {
+          {rascunhos.map((parecer) => {
             const textoLongo = parecer.texto.length > 220;
             const expandido = expandidos.has(parecer.id);
             return (
@@ -578,11 +728,7 @@ function SecaoParecer({
                 <span>
                   {parecer.autor} · {formatarData(parecer.criado_em.slice(0, 10))}
                 </span>
-                <span
-                  className={`etiqueta-estado${parecer.estado === "concluido" ? " etiqueta-estado--concluido" : ""}`}
-                >
-                  {parecer.estado_descricao}
-                </span>
+                <span className="etiqueta-estado">{parecer.estado_descricao}</span>
               </div>
               <p
                 className={`lista-pareceres__texto${textoLongo && !expandido ? " lista-pareceres__texto--truncado" : ""}`}
@@ -603,9 +749,7 @@ function SecaoParecer({
                 {parecer.prioritario ? (
                   <span className="etiqueta-alerta">Prioritário</span>
                 ) : null}
-                {podeAlterar &&
-                parecer.estado === "rascunho" &&
-                parecer.autor_id === usuarioId ? (
+                {podeAlterar && parecer.autor_id === usuarioId ? (
                   <div className="lista-pareceres__acoes">
                     <button type="button" onClick={() => setEditando(parecer)}>
                       Editar
@@ -772,48 +916,38 @@ const ESPECIALIDADES_DE_APOIO: { valor: Especialidade; rotulo: string }[] = [
 function SecaoApoio({
   servidorSismedId,
   permissoes,
+  solicitacoes,
+  carregando,
+  erro,
+  recarregar,
 }: {
   servidorSismedId: number;
   permissoes: string[];
+  solicitacoes: SolicitacaoApoio[];
+  carregando: boolean;
+  erro: string | null;
+  recarregar: () => void;
 }) {
-  const [solicitacoes, setSolicitacoes] = useState<SolicitacaoApoio[]>([]);
-  const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState<string | null>(null);
+  const [expandidos, setExpandidos] = useState<Set<number>>(new Set());
   const podeSolicitar = permissoes.includes("solicitar_apoio_especializado");
+  const abertas = solicitacoes.filter((solicitacao) => solicitacao.estado === "aberta");
 
-  function recarregar() {
-    setCarregando(true);
-    listarSolicitacoesDoServidor(servidorSismedId)
-      .then((resultado) => {
-        setSolicitacoes(resultado);
-        setErro(null);
-      })
-      .catch((error: unknown) => setErro(mensagemDoErro(error)))
-      .finally(() => setCarregando(false));
+  function alternarExpandido(solicitacaoId: number) {
+    setExpandidos((atual) => {
+      const novo = new Set(atual);
+      if (novo.has(solicitacaoId)) {
+        novo.delete(solicitacaoId);
+      } else {
+        novo.add(solicitacaoId);
+      }
+      return novo;
+    });
   }
-
-  useEffect(() => {
-    let ativo = true;
-    listarSolicitacoesDoServidor(servidorSismedId)
-      .then((resultado) => {
-        if (!ativo) return;
-        setSolicitacoes(resultado);
-        setErro(null);
-      })
-      .catch((error: unknown) => {
-        if (ativo) setErro(mensagemDoErro(error));
-      })
-      .finally(() => {
-        if (ativo) setCarregando(false);
-      });
-    return () => {
-      ativo = false;
-    };
-  }, [servidorSismedId]);
 
   return (
     <div className="secao-apoio">
-      <h3>Apoio multidisciplinar</h3>
+      <h3>Apoio multidisciplinar{abertas.length > 0 ? ` · ${abertas.length}` : ""}</h3>
+      <p className="texto-secundario">Solicitações respondidas aparecem na linha do tempo.</p>
 
       {carregando ? (
         <div className="estado-painel" aria-live="polite">
@@ -828,36 +962,41 @@ function SecaoApoio({
         </p>
       ) : null}
 
-      {!carregando && !erro && solicitacoes.length === 0 ? (
-        <p className="texto-secundario">Nenhuma solicitação de apoio registrada.</p>
+      {!carregando && !erro && abertas.length === 0 ? (
+        <p className="texto-secundario">Nenhuma solicitação de apoio em aberto.</p>
       ) : null}
 
-      {!carregando && solicitacoes.length > 0 ? (
+      {!carregando && abertas.length > 0 ? (
         <ul className="lista-solicitacoes-apoio">
-          {solicitacoes.map((solicitacao) => (
+          {abertas.map((solicitacao) => {
+            const textoLongo = solicitacao.texto_solicitacao.length > 220;
+            const expandido = expandidos.has(solicitacao.id);
+            return (
             <li key={solicitacao.id}>
               <div className="lista-solicitacoes-apoio__cabecalho">
                 <span>
                   {solicitacao.especialidade_descricao} · solicitado por{" "}
                   {solicitacao.solicitante}
                 </span>
-                <span
-                  className={`etiqueta-estado${solicitacao.estado === "respondida" ? " etiqueta-estado--concluido" : ""}`}
-                >
-                  {solicitacao.estado_descricao}
-                </span>
+                <span className="etiqueta-estado">{solicitacao.estado_descricao}</span>
               </div>
-              <p className="lista-solicitacoes-apoio__texto">
+              <p
+                className={`lista-solicitacoes-apoio__texto${textoLongo && !expandido ? " lista-solicitacoes-apoio__texto--truncado" : ""}`}
+              >
                 {solicitacao.texto_solicitacao}
               </p>
-              {solicitacao.estado === "respondida" ? (
-                <div className="lista-solicitacoes-apoio__resposta">
-                  <span>{solicitacao.respondente} respondeu</span>
-                  <p>{solicitacao.texto_resposta}</p>
-                </div>
+              {textoLongo ? (
+                <button
+                  type="button"
+                  className="lista-solicitacoes-apoio__ver-mais"
+                  onClick={() => alternarExpandido(solicitacao.id)}
+                >
+                  {expandido ? "Ver menos" : "Ver mais"}
+                </button>
               ) : null}
             </li>
-          ))}
+            );
+          })}
         </ul>
       ) : null}
 

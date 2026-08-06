@@ -1045,20 +1045,40 @@ tbody tr:last-child td {
   padding: 0.6rem 0.8rem;
   align-items: baseline;
   justify-content: space-between;
-  border: 1px solid #f3d2d2;
-  border-left: 3px solid var(--red);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--muted);
   border-radius: 0 7px 7px 0;
   background: white;
 }
 
 .alerta-cid__grupo b {
-  color: var(--red);
+  color: var(--text);
   font-size: 0.78rem;
 }
 
 .alerta-cid__grupo strong {
-  color: var(--red);
+  color: var(--text);
   font-size: 1.05rem;
+}
+
+.alerta-cid__grupo--medio {
+  border-color: #f7dfa8;
+  border-left-color: var(--amber);
+}
+
+.alerta-cid__grupo--medio b,
+.alerta-cid__grupo--medio strong {
+  color: var(--amber);
+}
+
+.alerta-cid__grupo--alto {
+  border-color: #f3d2d2;
+  border-left-color: var(--red);
+}
+
+.alerta-cid__grupo--alto b,
+.alerta-cid__grupo--alto strong {
+  color: var(--red);
 }
 
 .alerta-cid__grupo small {
@@ -1333,6 +1353,25 @@ tbody tr:last-child td {
   font-size: 0.78rem;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.lista-solicitacoes-apoio__texto--truncado {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.lista-solicitacoes-apoio__ver-mais {
+  display: block;
+  padding: 0;
+  margin: 0.4rem 0 0;
+  border: none;
+  background: none;
+  color: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .lista-solicitacoes-apoio__resposta {
@@ -1626,21 +1665,32 @@ tbody tr:last-child td {
   height: 26px;
   flex: 0 0 auto;
   place-items: center;
+  border: none;
   border-radius: 50%;
   color: var(--blue);
   background: #e5f3fc;
+  font-family: inherit;
   font-weight: 800;
   font-size: 0.85rem;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
   z-index: 1;
-}
-
-.linha-do-tempo__marca::after {
-  content: "+";
 }
 
 .linha-do-tempo__marca--atestado {
   color: var(--amber);
   background: #fff4d7;
+}
+
+.linha-do-tempo__marca--parecer {
+  color: var(--green);
+  background: #e3f7ef;
+}
+
+.linha-do-tempo__marca--apoio {
+  color: #7652ae;
+  background: #f0e9fa;
 }
 
 .linha-do-tempo__conteudo {
@@ -1663,9 +1713,11 @@ tbody tr:last-child td {
 }
 
 .linha-do-tempo__subtitulo {
-  margin: 0;
+  margin: 0.3rem 1.5rem 0 0;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  text-align: justify;
 }
 
 .linha-do-tempo__tag {
@@ -1683,6 +1735,16 @@ tbody tr:last-child td {
 .linha-do-tempo__tag--atestado {
   color: var(--amber);
   background: #fff4d7;
+}
+
+.linha-do-tempo__tag--parecer {
+  color: var(--green);
+  background: #e3f7ef;
+}
+
+.linha-do-tempo__tag--apoio {
+  color: #7652ae;
+  background: #f0e9fa;
 }
 
 .lista-dados dd {

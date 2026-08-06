@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Servidores } from "./Servidores";
@@ -101,6 +101,14 @@ const parecerConcluido = {
   criado_em: "2026-07-01T10:00:00Z",
   atualizado_em: "2026-07-01T10:00:00Z",
   concluido_em: "2026-07-01T10:05:00Z",
+};
+
+const parecerRascunho = {
+  ...parecerConcluido,
+  id: 6,
+  estado: "rascunho",
+  estado_descricao: "Rascunho",
+  concluido_em: null,
 };
 
 function resposta(status: number, body: unknown): Response {
@@ -252,6 +260,11 @@ describe("Servidores", () => {
           elemento?.textContent === "Z00.0 · Perícia médica de rotina",
       ),
     ).toBeInTheDocument();
+
+    screen
+      .getAllByRole("button", { name: "Expandir detalhes" })
+      .forEach((botao) => fireEvent.click(botao));
+
     expect(screen.getByText("Atestado · 15 dia(s)")).toBeInTheDocument();
     expect(screen.getByText("Atestado · 5 dia(s)")).toBeInTheDocument();
     expect(screen.getByText("Retorno em 30 dias.")).toBeInTheDocument();
@@ -284,7 +297,7 @@ describe("Servidores", () => {
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
-      .mockResolvedValueOnce(resposta(200, [parecerConcluido]))
+      .mockResolvedValueOnce(resposta(200, [parecerRascunho]))
       .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock, permissoesSemAlterar);
@@ -294,23 +307,23 @@ describe("Servidores", () => {
     expect(screen.queryByPlaceholderText(/Descreva a avaliação clínica/)).not.toBeInTheDocument();
   });
 
-  it("mostra a contagem de pareceres no título da seção", async () => {
+  it("mostra a contagem de pareceres em aberto no título da seção", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
       .mockResolvedValueOnce(resposta(200, servidorDetalheComHistoricoMedico))
-      .mockResolvedValueOnce(resposta(200, [parecerConcluido]))
+      .mockResolvedValueOnce(resposta(200, [parecerRascunho]))
       .mockResolvedValueOnce(resposta(200, []));
 
     await abrirModal(fetchMock, permissoesSemAlterar);
 
-    expect(await screen.findByText("Pareceres · 1")).toBeInTheDocument();
+    expect(await screen.findByText("Parecer em aberto · 1")).toBeInTheDocument();
   });
 
   it("trunca um parecer longo e permite expandir com Ver mais", async () => {
     const parecerLongo = {
-      ...parecerConcluido,
-      id: 6,
+      ...parecerRascunho,
+      id: 7,
       texto: "Paciente relata dor lombar recorrente. ".repeat(10),
     };
     const fetchMock = vi
@@ -349,7 +362,7 @@ describe("Servidores", () => {
     expect(screen.getByRole("button", { name: "Salvar rascunho" })).toBeInTheDocument();
   });
 
-  it("não mostra ação de editar em um parecer concluído", async () => {
+  it("move um parecer concluído do painel para a linha do tempo", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(resposta(200, [servidorResumo]))
@@ -359,8 +372,21 @@ describe("Servidores", () => {
 
     await abrirModal(fetchMock, permissoesComAlterar);
 
-    await screen.findByText("Paciente apto, sem restrições.");
+    await screen.findByText("Nenhum parecer em aberto no momento.");
+    expect(screen.queryByText("Paciente apto, sem restrições.")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
+
+    const tituloNaLinhaDoTempo = await screen.findByText(
+      (_, elemento) =>
+        elemento?.tagName === "H4" && elemento?.textContent === "Apto para o trabalho",
+    );
+    expect(tituloNaLinhaDoTempo).toBeInTheDocument();
+
+    fireEvent.click(within(tituloNaLinhaDoTempo.closest("li")!).getByRole("button"));
+
+    expect(
+      screen.getByText("Ana Souza: Paciente apto, sem restrições."),
+    ).toBeInTheDocument();
   });
 
   it("envia um novo parecer em rascunho", async () => {
@@ -394,7 +420,7 @@ describe("Servidores", () => {
     expect(corpo.concluir).toBe(false);
   });
 
-  it("mostra as solicitações de apoio e a resposta do especialista", async () => {
+  it("move uma solicitação de apoio respondida do painel para a linha do tempo", async () => {
     const solicitacaoRespondida = {
       id: 9,
       servidor_sismed_id: 1001,
@@ -421,10 +447,20 @@ describe("Servidores", () => {
 
     await abrirModal(fetchMock, permissoesSemAlterar);
 
-    expect(await screen.findByText("Avaliar posto de trabalho.")).toBeInTheDocument();
-    expect(screen.getByText("Carlos Lima respondeu")).toBeInTheDocument();
+    await screen.findByText("Nenhuma solicitação de apoio em aberto.");
+    expect(screen.queryByText("Avaliar posto de trabalho.")).not.toBeInTheDocument();
+
+    const tituloNaLinhaDoTempo = await screen.findByText(
+      (_, elemento) =>
+        elemento?.tagName === "H4" &&
+        elemento?.textContent === "Apoio de Segurança do Trabalho · solicitado por Ana Souza",
+    );
+    expect(tituloNaLinhaDoTempo).toBeInTheDocument();
+
+    fireEvent.click(within(tituloNaLinhaDoTempo.closest("li")!).getByRole("button"));
+
     expect(
-      screen.getByText("Posto avaliado, sem risco relevante."),
+      screen.getByText("Carlos Lima respondeu: Posto avaliado, sem risco relevante."),
     ).toBeInTheDocument();
   });
 
@@ -438,7 +474,7 @@ describe("Servidores", () => {
 
     await abrirModal(fetchMock, permissoesSemAlterar);
 
-    await screen.findByText("Nenhuma solicitação de apoio registrada.");
+    await screen.findByText("Nenhuma solicitação de apoio em aberto.");
     expect(screen.queryByText("Solicitar apoio")).not.toBeInTheDocument();
   });
 
@@ -492,7 +528,7 @@ describe("Servidores", () => {
 
     await abrirModal(fetchMock, permissoesComApoio);
 
-    await screen.findByText("Nenhuma solicitação de apoio registrada.");
+    await screen.findByText("Nenhuma solicitação de apoio em aberto.");
     fireEvent.change(screen.getByLabelText("Especialidade"), {
       target: { value: "assistencia_social" },
     });
