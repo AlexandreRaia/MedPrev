@@ -3,11 +3,15 @@ from collections.abc import Iterable
 from django.db.models import Q, QuerySet
 
 from apps.legado.models import (
+    Atendimento,
+    Encaminhamento,
     Pericia,
     Protocolo,
     ProtocoloCid,
     Servidor,
     SituacaoProtocolo,
+    StatusAtendimento,
+    TipoEncaminhamento,
 )
 
 LIMITE_PADRAO_BUSCA = 20
@@ -103,5 +107,51 @@ def descricoes_das_situacoes(situacao_ids: Iterable[int]) -> dict[int, str]:
     return dict(
         SituacaoProtocolo.objects.filter(cd_situacaoprotocolo__in=ids).values_list(
             "cd_situacaoprotocolo", "ds_situacaoprotocolo"
+        )
+    )
+
+
+def atendimentos_do_servidor(servidor_id: int) -> QuerySet[Atendimento]:
+    """Retorna os atendimentos registrados para o servidor, do mais recente ao mais antigo."""
+
+    return Atendimento.objects.filter(cd_servidor=servidor_id).order_by(
+        "-dt_atendimento", "-id_atendimento"
+    )
+
+
+def descricoes_dos_status_atendimento(status_ids: Iterable[int]) -> dict[int, str]:
+    """Mapeia códigos de status de atendimento (Agendado/Em atendimento/Concluído)."""
+
+    ids = {status_id for status_id in status_ids if status_id is not None}
+    if not ids:
+        return {}
+    return dict(
+        StatusAtendimento.objects.filter(id_status__in=ids).values_list("id_status", "ds_status")
+    )
+
+
+def encaminhamentos_por_atendimento(
+    atendimento_ids: Iterable[int],
+) -> dict[int, list[Encaminhamento]]:
+    """Mapeia cada atendimento aos encaminhamentos registrados nele."""
+
+    ids = {atendimento_id for atendimento_id in atendimento_ids if atendimento_id is not None}
+    if not ids:
+        return {}
+    agrupado: dict[int, list[Encaminhamento]] = {}
+    for encaminhamento in Encaminhamento.objects.filter(id_atendimento__in=ids):
+        agrupado.setdefault(encaminhamento.id_atendimento, []).append(encaminhamento)
+    return agrupado
+
+
+def descricoes_dos_tipos_encaminhamento(tipo_ids: Iterable[int]) -> dict[int, str]:
+    """Mapeia códigos de tipo de encaminhamento para sua descrição."""
+
+    ids = {tipo_id for tipo_id in tipo_ids if tipo_id is not None}
+    if not ids:
+        return {}
+    return dict(
+        TipoEncaminhamento.objects.filter(id_tipoencaminhamento__in=ids).values_list(
+            "id_tipoencaminhamento", "ds_tipoencaminhamento"
         )
     )

@@ -7,7 +7,7 @@ from django.test import Client, TestCase
 
 from apps.apoio.models import EventoSolicitacaoApoio, SolicitacaoApoio
 from apps.contas.models import Unidade
-from apps.legado.models import Servidor
+from apps.legado.models import Protocolo, Servidor, SituacaoProtocolo
 from apps.pareceres.services import concluir_parecer, criar_parecer
 
 
@@ -22,12 +22,16 @@ class ApiDeApoioTests(TestCase):
     def setUpClass(cls) -> None:
         with connection.schema_editor() as editor:
             editor.create_model(Servidor)
+            editor.create_model(SituacaoProtocolo)
+            editor.create_model(Protocolo)
         super().setUpClass()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         with connection.schema_editor() as editor:
+            editor.delete_model(Protocolo)
+            editor.delete_model(SituacaoProtocolo)
             editor.delete_model(Servidor)
 
     def setUp(self) -> None:
@@ -241,8 +245,36 @@ class ApiDeApoioTests(TestCase):
         self.assertEqual(dados[0]["servidor_nome"], "Servidor Teste")
         self.assertFalse(dados[0]["parecer_em_aberto"])
         self.assertIsNone(dados[0]["parecer_autor"])
-        self.assertEqual(dados[0]["solicitacoes_abertas"], 1)
-        self.assertEqual(dados[0]["solicitacoes_respondidas"], 0)
+        self.assertIsNone(dados[0]["situacao_protocolo"])
+        self.assertEqual(
+            dados[0]["apoios"],
+            [
+                {
+                    "especialidade": "seguranca_trabalho",
+                    "especialidade_descricao": "Segurança do Trabalho",
+                    "estado": "aberta",
+                    "estado_descricao": "Aguardando resposta",
+                }
+            ],
+        )
+
+    def test_atendimentos_mostra_situacao_do_protocolo_mais_recente(self) -> None:
+        situacao = SituacaoProtocolo.objects.create(
+            cd_situacaoprotocolo=1,
+            ds_situacaoprotocolo="Em analise",
+            st_ativo=True,
+        )
+        Protocolo.objects.create(
+            cd_protocolo=1,
+            dt_protocolo="2026-07-01",
+            cd_servidor=1001,
+            cd_situacaoprotocolo=situacao.cd_situacaoprotocolo,
+        )
+        self._post(self.cliente_medico, "/api/v1/apoio", self._payload_criacao())
+
+        response = self.cliente_medico.get("/api/v1/apoio/atendimentos")
+
+        self.assertEqual(response.json()[0]["situacao_protocolo"], "Em analise")
 
     def test_atendimentos_mostra_parecer_em_rascunho_sem_solicitacao(self) -> None:
         criar_parecer(
@@ -262,7 +294,7 @@ class ApiDeApoioTests(TestCase):
         self.assertEqual(len(dados), 1)
         self.assertTrue(dados[0]["parecer_em_aberto"])
         self.assertEqual(dados[0]["parecer_autor"], self.medico.get_username())
-        self.assertEqual(dados[0]["solicitacoes_abertas"], 0)
+        self.assertEqual(dados[0]["apoios"], [])
 
     def test_atendimentos_some_quando_tudo_e_concluido(self) -> None:
         parecer = criar_parecer(
@@ -285,7 +317,7 @@ class ApiDeApoioTests(TestCase):
         ainda_aberto = self.cliente_medico.get("/api/v1/apoio/atendimentos").json()
         self.assertEqual(len(ainda_aberto), 1)
         self.assertTrue(ainda_aberto[0]["parecer_em_aberto"])
-        self.assertEqual(ainda_aberto[0]["solicitacoes_respondidas"], 1)
+        self.assertEqual(ainda_aberto[0]["apoios"][0]["estado"], "respondida")
 
         concluir_parecer(ator=self.medico, parecer=parecer)
 
@@ -315,7 +347,8 @@ class ApiDeApoioTests(TestCase):
         dados = response.json()
         self.assertEqual(len(dados), 1)
         self.assertFalse(dados[0]["parecer_em_aberto"])
-        self.assertEqual(dados[0]["solicitacoes_abertas"], 1)
+        self.assertEqual(dados[0]["apoios"][0]["especialidade"], "assistencia_social")
+        self.assertEqual(dados[0]["apoios"][0]["estado"], "aberta")
 
     def test_atendimentos_mostra_pendencia_aberta_por_outro_medico_da_mesma_unidade(self) -> None:
         outro_medico = get_user_model().objects.create_user(

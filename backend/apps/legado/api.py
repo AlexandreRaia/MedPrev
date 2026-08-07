@@ -8,11 +8,15 @@ from apps.contas.permissions import (
     CONSULTAR_DADOS,
     nome_completo_da_permissao,
 )
-from apps.legado.models import Pericia, Protocolo, Servidor
+from apps.legado.models import Atendimento, Encaminhamento, Pericia, Protocolo, Servidor
 from apps.legado.selectors import (
+    atendimentos_do_servidor,
     buscar_servidores,
     cids_por_protocolo,
     descricoes_das_situacoes,
+    descricoes_dos_status_atendimento,
+    descricoes_dos_tipos_encaminhamento,
+    encaminhamentos_por_atendimento,
     pericias_do_protocolo,
     protocolos_do_servidor,
     protocolos_mais_recentes_por_servidor,
@@ -52,6 +56,22 @@ class PericiaResumoSaida(Schema):
     cids: list[str]
 
 
+class EncaminhamentoResumoSaida(Schema):
+    id: int
+    tipo: str | None
+    data: str | None
+    observacao: str | None
+
+
+class AtendimentoResumoSaida(Schema):
+    id: int
+    data: str | None
+    status: str | None
+    demanda_inicial: str | None
+    evolucao: str | None
+    encaminhamentos: list[EncaminhamentoResumoSaida]
+
+
 class ServidorDetalheSaida(ServidorResumoSaida):
     nascimento: str | None
     telefone: str | None
@@ -59,6 +79,7 @@ class ServidorDetalheSaida(ServidorResumoSaida):
     protocolos: list[ProtocoloResumoSaida]
     historico_medico_visivel: bool
     pericias: list[PericiaResumoSaida]
+    atendimentos: list[AtendimentoResumoSaida]
 
 
 def _serializar_resumo(servidor: Servidor, tramitacao: str | None = None) -> ServidorResumoSaida:
@@ -115,6 +136,40 @@ def _situacao_do_protocolo(protocolo: Protocolo | None, situacoes: dict[int, str
     return situacoes.get(protocolo.cd_situacaoprotocolo)
 
 
+def _serializar_encaminhamento(
+    encaminhamento: Encaminhamento, tipos: dict[int, str]
+) -> EncaminhamentoResumoSaida:
+    return EncaminhamentoResumoSaida(
+        id=encaminhamento.pk,
+        tipo=tipos.get(encaminhamento.id_tipoencaminhamento),
+        data=(
+            encaminhamento.dt_encaminhamento.isoformat()
+            if encaminhamento.dt_encaminhamento
+            else None
+        ),
+        observacao=encaminhamento.ds_observacao,
+    )
+
+
+def _serializar_atendimento(
+    atendimento: Atendimento,
+    status: dict[int, str],
+    encaminhamentos: list[Encaminhamento],
+    tipos_encaminhamento: dict[int, str],
+) -> AtendimentoResumoSaida:
+    return AtendimentoResumoSaida(
+        id=atendimento.pk,
+        data=atendimento.dt_atendimento.isoformat() if atendimento.dt_atendimento else None,
+        status=status.get(atendimento.id_status),
+        demanda_inicial=atendimento.ds_demandainicial,
+        evolucao=atendimento.ds_evolucao,
+        encaminhamentos=[
+            _serializar_encaminhamento(encaminhamento, tipos_encaminhamento)
+            for encaminhamento in encaminhamentos
+        ],
+    )
+
+
 @router.get("/servidores/{servidor_id}", response=ServidorDetalheSaida)
 def consultar_servidor(request, servidor_id: int):
     exigir_permissao(request, CONSULTAR_DADOS)
@@ -126,6 +181,7 @@ def consultar_servidor(request, servidor_id: int):
         nome_completo_da_permissao(CONSULTAR_CONTEUDO_MEDICO)
     )
     pericias: list[PericiaResumoSaida] = []
+    atendimentos: list[AtendimentoResumoSaida] = []
     if pode_ver_historico_medico:
         cids = cids_por_protocolo(protocolo.cd_protocolo for protocolo in protocolos)
         for protocolo in protocolos:
@@ -133,6 +189,28 @@ def consultar_servidor(request, servidor_id: int):
                 _serializar_pericia(pericia, cids)
                 for pericia in pericias_do_protocolo(protocolo.cd_protocolo)
             )
+
+        atendimentos_do_servidor_atual = list(atendimentos_do_servidor(servidor_id))
+        status_dos_atendimentos = descricoes_dos_status_atendimento(
+            atendimento.id_status for atendimento in atendimentos_do_servidor_atual
+        )
+        encaminhamentos_por_atendimento_atual = encaminhamentos_por_atendimento(
+            atendimento.pk for atendimento in atendimentos_do_servidor_atual
+        )
+        tipos_de_encaminhamento = descricoes_dos_tipos_encaminhamento(
+            encaminhamento.id_tipoencaminhamento
+            for encaminhamentos in encaminhamentos_por_atendimento_atual.values()
+            for encaminhamento in encaminhamentos
+        )
+        atendimentos = [
+            _serializar_atendimento(
+                atendimento,
+                status_dos_atendimentos,
+                encaminhamentos_por_atendimento_atual.get(atendimento.pk, []),
+                tipos_de_encaminhamento,
+            )
+            for atendimento in atendimentos_do_servidor_atual
+        ]
 
     resumo = _serializar_resumo(
         servidor, _situacao_do_protocolo(protocolos[0] if protocolos else None, situacoes)
@@ -152,4 +230,5 @@ def consultar_servidor(request, servidor_id: int):
         ],
         historico_medico_visivel=pode_ver_historico_medico,
         pericias=pericias,
+        atendimentos=atendimentos,
     )

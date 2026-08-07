@@ -1417,6 +1417,12 @@ tbody tr:last-child td {
   white-space: nowrap;
 }
 
+.lista-chips-apoio {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
 .abas-modal {
   display: flex;
   padding: 0.3rem;
@@ -1693,6 +1699,16 @@ tbody tr:last-child td {
   background: #f0e9fa;
 }
 
+.linha-do-tempo__marca--atendimento {
+  color: var(--cyan);
+  background: #e0f6fb;
+}
+
+.linha-do-tempo__marca--encaminhamento {
+  color: #0f766e;
+  background: #dcf5f0;
+}
+
 .linha-do-tempo__conteudo {
   min-width: 0;
 }
@@ -1745,6 +1761,16 @@ tbody tr:last-child td {
 .linha-do-tempo__tag--apoio {
   color: #7652ae;
   background: #f0e9fa;
+}
+
+.linha-do-tempo__tag--atendimento {
+  color: var(--cyan);
+  background: #e0f6fb;
+}
+
+.linha-do-tempo__tag--encaminhamento {
+  color: #0f766e;
+  background: #dcf5f0;
 }
 
 .lista-dados dd {

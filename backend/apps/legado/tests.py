@@ -14,18 +14,26 @@ from apps.legado.dump_importer import (
     parse_table_definition,
 )
 from apps.legado.models import (
+    Atendimento,
+    Encaminhamento,
     Licenca,
     Pericia,
     Protocolo,
     ProtocoloCid,
     Servidor,
     SituacaoProtocolo,
+    StatusAtendimento,
     TabelaImportadaModel,
+    TipoEncaminhamento,
 )
 from apps.legado.selectors import (
+    atendimentos_do_servidor,
     buscar_servidores,
     cids_por_protocolo,
     descricoes_das_situacoes,
+    descricoes_dos_status_atendimento,
+    descricoes_dos_tipos_encaminhamento,
+    encaminhamentos_por_atendimento,
     pericias_do_protocolo,
     protocolos_do_servidor,
     protocolos_mais_recentes_por_servidor,
@@ -74,6 +82,10 @@ class MapeamentoDasTabelasFicticiasTests(SimpleTestCase):
             (Pericia, "cd_protocolo"),
             (Pericia, "cd_licenca"),
             (Pericia, "cd_profissional"),
+            (Atendimento, "cd_servidor"),
+            (Atendimento, "id_status"),
+            (Encaminhamento, "id_atendimento"),
+            (Encaminhamento, "id_tipoencaminhamento"),
         ]
 
         for modelo, campo in referencias:
@@ -166,12 +178,20 @@ class ApiDeServidoresTests(TestCase):
             editor.create_model(Protocolo)
             editor.create_model(Pericia)
             editor.create_model(ProtocoloCid)
+            editor.create_model(StatusAtendimento)
+            editor.create_model(Atendimento)
+            editor.create_model(TipoEncaminhamento)
+            editor.create_model(Encaminhamento)
         super().setUpClass()
 
     @classmethod
     def tearDownClass(cls) -> None:
         super().tearDownClass()
         with connection.schema_editor() as editor:
+            editor.delete_model(Encaminhamento)
+            editor.delete_model(TipoEncaminhamento)
+            editor.delete_model(Atendimento)
+            editor.delete_model(StatusAtendimento)
             editor.delete_model(ProtocoloCid)
             editor.delete_model(Pericia)
             editor.delete_model(Protocolo)
@@ -230,6 +250,25 @@ class ApiDeServidoresTests(TestCase):
             cd_protocolo=1,
             cd_cid="Z00.0",
             st_ativo=True,
+        )
+        StatusAtendimento.objects.create(id_status=2, ds_status="Em atendimento", st_ativo=True)
+        Atendimento.objects.create(
+            id_atendimento=1,
+            cd_servidor=1001,
+            id_status=2,
+            ds_demandainicial="Avaliação periódica",
+            ds_evolucao="Sem intercorrências.",
+            dt_atendimento="2024-03-06 10:00:00+00:00",
+        )
+        TipoEncaminhamento.objects.create(
+            id_tipoencaminhamento=1, ds_tipoencaminhamento="Psicologia", st_ativo=True
+        )
+        Encaminhamento.objects.create(
+            id_encaminhamento=1,
+            id_atendimento=1,
+            id_tipoencaminhamento=1,
+            dt_encaminhamento="2024-03-06 10:30:00+00:00",
+            ds_observacao="Encaminhado para avaliação psicológica.",
         )
 
     def test_recusa_usuario_nao_autenticado(self) -> None:
@@ -300,6 +339,7 @@ class ApiDeServidoresTests(TestCase):
         dados = response.json()
         self.assertFalse(dados["historico_medico_visivel"])
         self.assertEqual(dados["pericias"], [])
+        self.assertEqual(dados["atendimentos"], [])
 
     def test_detalhe_inclui_historico_medico_com_a_permissao_especifica(self) -> None:
         self.usuario.groups.add(Group.objects.get(name="Médico"))
@@ -321,6 +361,16 @@ class ApiDeServidoresTests(TestCase):
         self.assertTrue(dados["pericias"][0]["atestado"])
         self.assertEqual(dados["pericias"][0]["dias_atestado"], 15)
         self.assertEqual(dados["pericias"][0]["cids"], ["Z00.0"])
+        self.assertEqual(len(dados["atendimentos"]), 1)
+        self.assertEqual(dados["atendimentos"][0]["status"], "Em atendimento")
+        self.assertEqual(dados["atendimentos"][0]["demanda_inicial"], "Avaliação periódica")
+        self.assertEqual(dados["atendimentos"][0]["evolucao"], "Sem intercorrências.")
+        self.assertEqual(len(dados["atendimentos"][0]["encaminhamentos"]), 1)
+        self.assertEqual(dados["atendimentos"][0]["encaminhamentos"][0]["tipo"], "Psicologia")
+        self.assertEqual(
+            dados["atendimentos"][0]["encaminhamentos"][0]["observacao"],
+            "Encaminhado para avaliação psicológica.",
+        )
 
     def test_detalhe_de_servidor_inexistente_retorna_404(self) -> None:
         response = self.cliente.get("/api/v1/legado/servidores/9999")
@@ -425,6 +475,77 @@ class SelectorDeProtocolosMaisRecentesTests(TestCase):
         self.assertEqual(set(resultado), {1001, 1002})
         self.assertEqual(resultado[1001].cd_protocolo, 2)
         self.assertEqual(resultado[1002].cd_protocolo, 3)
+
+
+class SelectorDeAtendimentosTests(TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        with connection.schema_editor() as editor:
+            editor.create_model(StatusAtendimento)
+            editor.create_model(Atendimento)
+            editor.create_model(TipoEncaminhamento)
+            editor.create_model(Encaminhamento)
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        super().tearDownClass()
+        with connection.schema_editor() as editor:
+            editor.delete_model(Encaminhamento)
+            editor.delete_model(TipoEncaminhamento)
+            editor.delete_model(Atendimento)
+            editor.delete_model(StatusAtendimento)
+
+    def test_atendimentos_do_servidor_ordena_do_mais_recente(self) -> None:
+        Atendimento.objects.create(
+            id_atendimento=1, cd_servidor=1001, dt_atendimento="2024-01-10 09:00:00+00:00"
+        )
+        Atendimento.objects.create(
+            id_atendimento=2, cd_servidor=1001, dt_atendimento="2024-03-01 09:00:00+00:00"
+        )
+        Atendimento.objects.create(
+            id_atendimento=3, cd_servidor=1002, dt_atendimento="2024-02-01 09:00:00+00:00"
+        )
+
+        resultado = list(atendimentos_do_servidor(1001))
+
+        self.assertEqual([atendimento.pk for atendimento in resultado], [2, 1])
+
+    def test_descricoes_dos_status_ignora_ausentes(self) -> None:
+        StatusAtendimento.objects.create(id_status=2, ds_status="Em atendimento")
+
+        resultado = descricoes_dos_status_atendimento([2, None, 999])
+
+        self.assertEqual(resultado, {2: "Em atendimento"})
+
+    def test_descricoes_dos_status_lista_vazia_nao_consulta_o_banco(self) -> None:
+        self.assertEqual(descricoes_dos_status_atendimento([]), {})
+
+    def test_agrupa_encaminhamentos_por_atendimento(self) -> None:
+        Encaminhamento.objects.create(id_encaminhamento=1, id_atendimento=1)
+        Encaminhamento.objects.create(id_encaminhamento=2, id_atendimento=1)
+        Encaminhamento.objects.create(id_encaminhamento=3, id_atendimento=2)
+
+        resultado = encaminhamentos_por_atendimento([1, 2, 9999])
+
+        self.assertEqual(len(resultado[1]), 2)
+        self.assertEqual(len(resultado[2]), 1)
+        self.assertNotIn(9999, resultado)
+
+    def test_encaminhamentos_lista_vazia_nao_consulta_o_banco(self) -> None:
+        self.assertEqual(encaminhamentos_por_atendimento([]), {})
+
+    def test_descricoes_dos_tipos_de_encaminhamento_ignora_ausentes(self) -> None:
+        TipoEncaminhamento.objects.create(
+            id_tipoencaminhamento=1, ds_tipoencaminhamento="Psicologia"
+        )
+
+        resultado = descricoes_dos_tipos_encaminhamento([1, None, 999])
+
+        self.assertEqual(resultado, {1: "Psicologia"})
+
+    def test_tipos_de_encaminhamento_lista_vazia_nao_consulta_o_banco(self) -> None:
+        self.assertEqual(descricoes_dos_tipos_encaminhamento([]), {})
 
 
 class ComandoSeedPericiasDemoTests(TestCase):

@@ -36,6 +36,7 @@ const servidorDetalheSemHistoricoMedico = {
   protocolos: [{ id: 1, data: diasAtras(10), situacao: "Em andamento" }],
   historico_medico_visivel: false,
   pericias: [],
+  atendimentos: [],
 };
 
 const servidorDetalheComHistoricoMedico = {
@@ -290,6 +291,51 @@ describe("Servidores", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Análise gráfica/ }));
     expect(screen.getByText("20d")).toBeInTheDocument();
+  });
+
+  it("mostra atendimentos e encaminhamentos do SisMed na linha do tempo", async () => {
+    const servidorDetalheComAtendimento = {
+      ...servidorDetalheComHistoricoMedico,
+      pericias: [],
+      atendimentos: [
+        {
+          id: 1,
+          data: diasAtras(2),
+          status: "Em atendimento",
+          demanda_inicial: "Avaliação periódica",
+          evolucao: "Sem intercorrências.",
+          encaminhamentos: [
+            {
+              id: 1,
+              tipo: "Psicologia",
+              data: diasAtras(1),
+              observacao: "Encaminhado para avaliação psicológica.",
+            },
+          ],
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(resposta(200, [servidorResumo]))
+      .mockResolvedValueOnce(resposta(200, servidorDetalheComAtendimento))
+      .mockResolvedValueOnce(resposta(200, []))
+      .mockResolvedValueOnce(resposta(200, []));
+
+    await abrirModal(fetchMock);
+
+    expect(await screen.findByText("Avaliação periódica")).toBeInTheDocument();
+    expect(screen.getByText("Em atendimento")).toBeInTheDocument();
+    expect(screen.getByText("Encaminhamento para Psicologia")).toBeInTheDocument();
+
+    screen
+      .getAllByRole("button", { name: "Expandir detalhes" })
+      .forEach((botao) => fireEvent.click(botao));
+
+    expect(screen.getByText("Sem intercorrências.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Encaminhado para avaliação psicológica."),
+    ).toBeInTheDocument();
   });
 
   it("mostra o histórico de pareceres sem formulário para quem só consulta", async () => {

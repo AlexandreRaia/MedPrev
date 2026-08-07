@@ -31,6 +31,22 @@ export type PericiaResumo = {
   cids: string[];
 };
 
+export type EncaminhamentoResumo = {
+  id: number;
+  tipo: string | null;
+  data: string | null;
+  observacao: string | null;
+};
+
+export type AtendimentoResumo = {
+  id: number;
+  data: string | null;
+  status: string | null;
+  demanda_inicial: string | null;
+  evolucao: string | null;
+  encaminhamentos: EncaminhamentoResumo[];
+};
+
 export type ServidorDetalhe = ServidorResumo & {
   nascimento: string | null;
   email: string | null;
@@ -39,6 +55,7 @@ export type ServidorDetalhe = ServidorResumo & {
   protocolos: ProtocoloResumo[];
   historico_medico_visivel: boolean;
   pericias: PericiaResumo[];
+  atendimentos: AtendimentoResumo[];
 };
 
 export function buscarServidores(

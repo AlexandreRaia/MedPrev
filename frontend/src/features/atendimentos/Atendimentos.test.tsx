@@ -29,10 +29,23 @@ const solicitacaoPendente = {
 const atendimentoAberto = {
   servidor_sismed_id: 1001,
   servidor_nome: "Maria da Silva",
+  situacao_protocolo: "Em analise",
   parecer_em_aberto: true,
   parecer_autor: "Ana Souza",
-  solicitacoes_abertas: 1,
-  solicitacoes_respondidas: 2,
+  apoios: [
+    {
+      especialidade: "seguranca_trabalho",
+      especialidade_descricao: "Segurança do Trabalho",
+      estado: "aberta",
+      estado_descricao: "Aguardando resposta",
+    },
+    {
+      especialidade: "assistencia_social",
+      especialidade_descricao: "Assistente Social",
+      estado: "respondida",
+      estado_descricao: "Respondida",
+    },
+  ],
   ultima_atividade_em: "2026-07-01T10:00:00Z",
 };
 
@@ -149,10 +162,15 @@ describe("Atendimentos — atendimentos do médico", () => {
     render(<Atendimentos permissoes={permissoesMedico} usuarioId={usuarioIdPadrao} />);
 
     expect(await screen.findByText("Maria da Silva")).toBeInTheDocument();
+    expect(screen.getByText("Em analise")).toBeInTheDocument();
     expect(screen.getByText("Em rascunho")).toBeInTheDocument();
     expect(screen.getByText("Ana Souza")).toBeInTheDocument();
-    expect(screen.getByText("1 aguardando")).toBeInTheDocument();
-    expect(screen.getByText("2 respondida(s)")).toBeInTheDocument();
+    expect(
+      screen.getByText("Segurança do Trabalho: Aguardando resposta"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Assistente Social: Respondida"),
+    ).toBeInTheDocument();
   });
 
   it("abre o prontuário do servidor ao clicar em Abrir prontuário", async () => {
@@ -175,6 +193,7 @@ describe("Atendimentos — atendimentos do médico", () => {
           protocolos: [],
           historico_medico_visivel: false,
           pericias: [],
+          atendimentos: [],
         }),
       );
     vi.stubGlobal("fetch", fetchMock);

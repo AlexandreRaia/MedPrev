@@ -207,3 +207,58 @@ class ProtocoloCid(TabelaImportadaModel):
     class Meta:
         managed = False
         db_table = "protocolocid"
+
+
+class StatusAtendimento(TabelaImportadaModel):
+    id_status = models.BigIntegerField(primary_key=True)
+    ds_status = models.TextField(null=True)
+    st_ativo = models.BooleanField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = "status"
+
+
+class Atendimento(TabelaImportadaModel):
+    id_atendimento = models.BigIntegerField(primary_key=True)
+    cd_servidor = models.IntegerField(null=True)
+    cd_calendario = models.IntegerField(null=True)
+    id_status = models.IntegerField(null=True)
+    ds_historicomedico = models.TextField(null=True)
+    ds_demandainicial = models.TextField(null=True)
+    ds_evolucao = models.TextField(null=True)
+    ds_observacao = models.TextField(null=True)
+    dt_atendimento = models.DateTimeField(null=True)
+    dt_cadastro = models.DateTimeField(null=True)
+    id_usuario = models.IntegerField(null=True)
+    st_atendido = models.BooleanField(null=True)
+    st_ativo = models.BooleanField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = "atendimento"
+
+
+class TipoEncaminhamento(TabelaImportadaModel):
+    id_tipoencaminhamento = models.BigIntegerField(primary_key=True)
+    ds_tipoencaminhamento = models.TextField(null=True)
+    st_ativo = models.BooleanField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = "tipoencaminhamento"
+
+
+class Encaminhamento(TabelaImportadaModel):
+    id_encaminhamento = models.BigIntegerField(primary_key=True)
+    id_atendimento = models.IntegerField(null=True)
+    id_tipoencaminhamento = models.IntegerField(null=True)
+    dt_encaminhamento = models.DateTimeField(null=True)
+    ds_observacao = models.TextField(null=True)
+    dt_cadastro = models.DateTimeField(null=True)
+    id_usuario = models.IntegerField(null=True)
+    st_ativo = models.BooleanField(null=True)
+
+    class Meta:
+        managed = False
+        db_table = "encaminhamento"

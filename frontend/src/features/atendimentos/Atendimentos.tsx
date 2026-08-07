@@ -104,6 +104,14 @@ function AtendimentosDaUnidade({
                       <span className="codigo-prontuario">
                         P{atendimento.servidor_sismed_id}
                       </span>
+                      {atendimento.situacao_protocolo ? (
+                        <>
+                          {" "}
+                          <span className="etiqueta-situacao">
+                            {atendimento.situacao_protocolo}
+                          </span>
+                        </>
+                      ) : null}
                     </td>
                     <td>
                       {atendimento.parecer_em_aberto ? (
@@ -116,22 +124,23 @@ function AtendimentosDaUnidade({
                       )}
                     </td>
                     <td>
-                      {atendimento.solicitacoes_abertas === 0 &&
-                      atendimento.solicitacoes_respondidas === 0 ? (
+                      {atendimento.apoios.length === 0 ? (
                         <span className="texto-secundario">Nenhuma</span>
                       ) : (
-                        <>
-                          {atendimento.solicitacoes_abertas > 0 ? (
-                            <span className="etiqueta-alerta">
-                              {atendimento.solicitacoes_abertas} aguardando
+                        <div className="lista-chips-apoio">
+                          {atendimento.apoios.map((apoio) => (
+                            <span
+                              key={apoio.especialidade}
+                              className={
+                                apoio.estado === "respondida"
+                                  ? "etiqueta-estado etiqueta-estado--concluido"
+                                  : "etiqueta-estado"
+                              }
+                            >
+                              {apoio.especialidade_descricao}: {apoio.estado_descricao}
                             </span>
-                          ) : null}{" "}
-                          {atendimento.solicitacoes_respondidas > 0 ? (
-                            <span className="etiqueta-estado etiqueta-estado--concluido">
-                              {atendimento.solicitacoes_respondidas} respondida(s)
-                            </span>
-                          ) : null}
-                        </>
+                          ))}
+                        </div>
                       )}
                     </td>
                     <td className="celula-acao">

@@ -16,6 +16,7 @@ from apps.contas.permissions import (
     nome_completo_da_permissao,
 )
 from apps.legado.models import Servidor
+from apps.legado.selectors import descricoes_das_situacoes, protocolos_mais_recentes_por_servidor
 from apps.pareceres.models import Parecer
 
 router = Router(tags=["Apoio"], auth=django_auth)
@@ -43,13 +44,20 @@ class MinhaSolicitacaoSaida(SolicitacaoApoioSaida):
     servidor_nome: str | None
 
 
+class ApoioPorEspecialidadeSaida(Schema):
+    especialidade: str
+    especialidade_descricao: str
+    estado: str
+    estado_descricao: str
+
+
 class AtendimentoAbertoSaida(Schema):
     servidor_sismed_id: int
     servidor_nome: str | None
+    situacao_protocolo: str | None
     parecer_em_aberto: bool
     parecer_autor: str | None
-    solicitacoes_abertas: int
-    solicitacoes_respondidas: int
+    apoios: list[ApoioPorEspecialidadeSaida]
     ultima_atividade_em: str
 
 
@@ -166,6 +174,39 @@ def responder(request, solicitacao_id: int, dados: SolicitacaoApoioResponderEntr
     return _serializar(solicitacao)
 
 
+def _apoios_por_especialidade(
+    solicitacoes_do_servidor: list[SolicitacaoApoio],
+) -> list[ApoioPorEspecialidadeSaida]:
+    """
+    Um selo por especialidade já solicitada para o servidor — em paralelo, sem
+    ordem entre elas. Se houver mais de uma solicitação da mesma especialidade,
+    uma ainda aberta tem prioridade sobre uma já respondida.
+    """
+    por_especialidade: dict[str, list[SolicitacaoApoio]] = {}
+    for solicitacao in solicitacoes_do_servidor:
+        por_especialidade.setdefault(solicitacao.especialidade, []).append(solicitacao)
+
+    apoios = []
+    for especialidade, _descricao in SolicitacaoApoio.Especialidade.choices:
+        solicitacoes = por_especialidade.get(especialidade)
+        if not solicitacoes:
+            continue
+        estado = (
+            SolicitacaoApoio.Estado.ABERTA
+            if any(s.estado == SolicitacaoApoio.Estado.ABERTA for s in solicitacoes)
+            else SolicitacaoApoio.Estado.RESPONDIDA
+        )
+        apoios.append(
+            ApoioPorEspecialidadeSaida(
+                especialidade=especialidade,
+                especialidade_descricao=solicitacoes[0].get_especialidade_display(),
+                estado=estado,
+                estado_descricao=SolicitacaoApoio.Estado(estado).label,
+            )
+        )
+    return apoios
+
+
 @router.get("/atendimentos", response=list[AtendimentoAbertoSaida])
 def listar_atendimentos(request):
     """
@@ -203,6 +244,10 @@ def listar_atendimentos(request):
             "cd_servidor", "nm_servidor"
         )
     )
+    protocolos_recentes = protocolos_mais_recentes_por_servidor(servidor_ids)
+    situacoes_dos_protocolos = descricoes_das_situacoes(
+        protocolo.cd_situacaoprotocolo for protocolo in protocolos_recentes.values()
+    )
 
     resumos = []
     for servidor_id in servidor_ids:
@@ -216,16 +261,6 @@ def listar_atendimentos(request):
             for solicitacao in solicitacoes
             if solicitacao.servidor_sismed_id == servidor_id
         ]
-        abertas = sum(
-            1
-            for solicitacao in solicitacoes_do_servidor
-            if solicitacao.estado == SolicitacaoApoio.Estado.ABERTA
-        )
-        respondidas = sum(
-            1
-            for solicitacao in solicitacoes_do_servidor
-            if solicitacao.estado == SolicitacaoApoio.Estado.RESPONDIDA
-        )
         datas = [parecer.atualizado_em for parecer in pareceres_do_servidor] + [
             solicitacao.respondido_em or solicitacao.criado_em
             for solicitacao in solicitacoes_do_servidor
@@ -235,14 +270,21 @@ def listar_atendimentos(request):
             autor = pareceres_do_servidor[0].autor
             parecer_autor = autor.get_full_name() or autor.get_username()
 
+        protocolo_recente = protocolos_recentes.get(servidor_id)
+        situacao_protocolo = (
+            situacoes_dos_protocolos.get(protocolo_recente.cd_situacaoprotocolo)
+            if protocolo_recente
+            else None
+        )
+
         resumos.append(
             AtendimentoAbertoSaida(
                 servidor_sismed_id=servidor_id,
                 servidor_nome=nomes_dos_servidores.get(servidor_id),
+                situacao_protocolo=situacao_protocolo,
                 parecer_em_aberto=len(pareceres_do_servidor) > 0,
                 parecer_autor=parecer_autor,
-                solicitacoes_abertas=abertas,
-                solicitacoes_respondidas=respondidas,
+                apoios=_apoios_por_especialidade(solicitacoes_do_servidor),
                 ultima_atividade_em=max(datas).isoformat(),
             )
         )

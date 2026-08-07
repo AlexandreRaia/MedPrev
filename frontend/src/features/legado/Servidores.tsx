@@ -15,6 +15,7 @@ import {
 } from "../pareceres/api";
 import { ApiError } from "../../shared/api/client";
 import {
+  AtendimentoResumo,
   buscarServidores,
   consultarServidor,
   PericiaResumo,
@@ -55,7 +56,7 @@ function severidadeCid(dias: number): "baixo" | "medio" | "alto" {
 type EventoLinhaDoTempo = {
   id: string;
   data: string;
-  tipo: "atestado" | "consulta" | "parecer" | "apoio";
+  tipo: "atestado" | "consulta" | "parecer" | "apoio" | "atendimento" | "encaminhamento";
   tag: string;
   cid: string | null;
   titulo: string;
@@ -66,6 +67,7 @@ function montarLinhaDoTempo(
   pericias: PericiaResumo[],
   pareceres: Parecer[],
   solicitacoes: SolicitacaoApoio[],
+  atendimentos: AtendimentoResumo[],
 ): EventoLinhaDoTempo[] {
   const eventosDePericias: EventoLinhaDoTempo[] = pericias.map((pericia) => ({
     id: `pericia-${pericia.id}`,
@@ -107,9 +109,35 @@ function montarLinhaDoTempo(
       subtitulo: `${solicitacao.respondente ?? "—"} respondeu: ${solicitacao.texto_resposta}`,
     }));
 
-  return [...eventosDePericias, ...eventosDePareceres, ...eventosDeApoio].sort((a, b) =>
-    a.data < b.data ? 1 : a.data > b.data ? -1 : 0,
+  const eventosDeAtendimentos: EventoLinhaDoTempo[] = atendimentos.map((atendimento) => ({
+    id: `atendimento-${atendimento.id}`,
+    data: (atendimento.data ?? "").slice(0, 10),
+    tipo: "atendimento",
+    tag: atendimento.status ?? "Atendimento",
+    cid: null,
+    titulo: atendimento.demanda_inicial ?? "Atendimento registrado",
+    subtitulo: atendimento.evolucao ?? "Sem evolução registrada",
+  }));
+
+  const eventosDeEncaminhamentos: EventoLinhaDoTempo[] = atendimentos.flatMap((atendimento) =>
+    atendimento.encaminhamentos.map((encaminhamento) => ({
+      id: `encaminhamento-${encaminhamento.id}`,
+      data: (encaminhamento.data ?? atendimento.data ?? "").slice(0, 10),
+      tipo: "encaminhamento" as const,
+      tag: encaminhamento.tipo ?? "Encaminhamento",
+      cid: null,
+      titulo: `Encaminhamento para ${encaminhamento.tipo ?? "especialidade não informada"}`,
+      subtitulo: encaminhamento.observacao ?? "Sem observações registradas",
+    })),
   );
+
+  return [
+    ...eventosDePericias,
+    ...eventosDePareceres,
+    ...eventosDeApoio,
+    ...eventosDeAtendimentos,
+    ...eventosDeEncaminhamentos,
+  ].sort((a, b) => (a.data < b.data ? 1 : a.data > b.data ? -1 : 0));
 }
 
 export function Servidores({
@@ -416,6 +444,7 @@ export function DetalheServidorModal({
     detalhe?.pericias ?? [],
     pareceres,
     solicitacoes,
+    detalhe?.atendimentos ?? [],
   );
 
   return (

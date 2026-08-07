@@ -28,13 +28,20 @@ export type MinhaSolicitacaoApoio = SolicitacaoApoio & {
   servidor_nome: string | null;
 };
 
+export type ApoioPorEspecialidade = {
+  especialidade: Especialidade;
+  especialidade_descricao: string;
+  estado: "aberta" | "respondida";
+  estado_descricao: string;
+};
+
 export type AtendimentoAberto = {
   servidor_sismed_id: number;
   servidor_nome: string | null;
+  situacao_protocolo: string | null;
   parecer_em_aberto: boolean;
   parecer_autor: string | null;
-  solicitacoes_abertas: number;
-  solicitacoes_respondidas: number;
+  apoios: ApoioPorEspecialidade[];
   ultima_atividade_em: string;
 };
 
