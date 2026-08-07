@@ -54,8 +54,12 @@ sentido na hora.
 
 A Visão Geral (painel de indicadores) não depende mais de uma permissão
 específica: os números que ela mostra são agregados e não identificam nenhum
-servidor, então qualquer perfil autenticado a vê, escopada pela própria
-unidade (visão global só para quem tem `visualizar_dados_globais`).
+servidor, então qualquer perfil autenticado a vê — do sistema inteiro, sem
+escopo por unidade. A Consulta já permite localizar qualquer servidor
+independente da unidade de quem procura, então restringir só o painel
+agregado não protegia nada. Só o cartão pessoal de solicitações pendentes
+continua específico do usuário, porque é sobre o que ele mesmo tem para
+fazer.
 
 ## Permissões de negócio
 

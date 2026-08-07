@@ -105,7 +105,7 @@ export function PainelIndicadores({
           icone="◎"
           valor={String(indicadores.servidores_acompanhados)}
           rotulo="Servidores acompanhados"
-          detalhe="Com parecer registrado"
+          detalhe="Com parecer registrado · em todo o sistema"
         />
         <CartaoIndicador
           tom="verde"
@@ -119,7 +119,7 @@ export function PainelIndicadores({
           icone="◷"
           valor={String(indicadores.pareceres_em_rascunho)}
           rotulo="Pareceres em rascunho"
-          detalhe="Aguardando conclusão"
+          detalhe="Aguardando conclusão · em todo o sistema"
         />
         <CartaoIndicador
           tom="roxo"
@@ -133,7 +133,7 @@ export function PainelIndicadores({
           icone="⇄"
           valor={String(indicadores.solicitacoes_apoio_abertas)}
           rotulo="Solicitações de apoio abertas"
-          detalhe="Aguardando resposta do especialista"
+          detalhe="Aguardando resposta · em todo o sistema"
         />
         {indicadores.minhas_solicitacoes_pendentes !== null ? (
           <button

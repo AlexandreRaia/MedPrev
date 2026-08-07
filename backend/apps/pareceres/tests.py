@@ -346,7 +346,13 @@ class ApiDeIndicadoresTests(TestCase):
         codigos = {grupo["codigo"] for grupo in dados["grupos_cid"]}
         self.assertEqual(codigos, {"M54.5", "Z00.0"})
 
-    def test_usuario_de_outra_unidade_nao_ve_pareceres_de_unidade_diferente(self) -> None:
+    def test_usuario_de_outra_unidade_ve_pareceres_de_todas_as_unidades(self) -> None:
+        """
+        A Visão Geral é global para qualquer perfil autenticado: os números
+        são agregados e a Consulta já permite localizar qualquer servidor
+        independente da unidade, então não faz sentido a Visão Geral mostrar
+        só uma fatia.
+        """
         outra_unidade = Unidade.objects.get(codigo="medicina-do-trabalho")
         medico_de_outra_unidade = get_user_model().objects.create_user(
             username="medico.outra.unidade",
@@ -361,10 +367,8 @@ class ApiDeIndicadoresTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         dados = response.json()
-        self.assertEqual(dados["servidores_acompanhados"], 0)
-        self.assertEqual(dados["pareceres_em_rascunho"], 0)
-        # As métricas de perícia/CID não têm unidade do MedPrev associada no
-        # schema atual e continuam agregadas em todo o legado.
+        self.assertEqual(dados["servidores_acompanhados"], 1)
+        self.assertEqual(dados["pareceres_em_rascunho"], 1)
         self.assertEqual(dados["pericias_60_dias"], 2)
 
     def test_pendencias_de_apoio_por_perfil(self) -> None:

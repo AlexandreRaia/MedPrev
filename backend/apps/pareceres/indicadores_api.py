@@ -7,7 +7,6 @@ from apps.apoio.models import SolicitacaoApoio
 from apps.contas.permissions import (
     RESPONDER_SOLICITACAO_APOIO,
     SOLICITAR_APOIO_ESPECIALIZADO,
-    VISUALIZAR_DADOS_GLOBAIS,
     nome_completo_da_permissao,
 )
 from apps.legado.models import Pericia
@@ -42,21 +41,16 @@ def _tem_permissao(request, codename: str) -> bool:
 def consultar_indicadores(request):
     """
     Os indicadores são agregados e não identificam nenhum servidor
-    individualmente, então qualquer perfil autenticado pode consultá-los. As
-    métricas derivadas do MedPrev (Parecer, SolicitacaoApoio) são escopadas
-    pela unidade do usuário, a menos que ele tenha visão global. As métricas
-    derivadas puramente do legado (perícias, CIDs) não têm unidade do MedPrev
-    associada no schema atual e continuam agregadas em todo o legado.
+    individualmente, então qualquer perfil autenticado pode consultá-los, e a
+    Visão Geral mostra o sistema inteiro — sem escopo por unidade. A Consulta
+    já permite localizar qualquer servidor independente da unidade de quem
+    procura, então restringir só o painel agregado não protegia nada, apenas
+    mostrava uma fatia incompleta. Só `minhas_solicitacoes_pendentes` continua
+    pessoal, porque é sobre o que o próprio usuário tem para fazer.
     """
-
-    visao_global = _tem_permissao(request, VISUALIZAR_DADOS_GLOBAIS)
-    unidade_do_usuario = request.user.unidade
 
     pareceres = Parecer.objects.all()
     solicitacoes = SolicitacaoApoio.objects.all()
-    if not visao_global:
-        pareceres = pareceres.filter(unidade=unidade_do_usuario)
-        solicitacoes = solicitacoes.filter(unidade=unidade_do_usuario)
 
     limite = datetime.date.today() - datetime.timedelta(days=JANELA_EM_DIAS)
     pericias_recentes = list(Pericia.objects.filter(dt_pericia__gte=limite))
