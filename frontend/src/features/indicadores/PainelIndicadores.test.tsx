@@ -15,6 +15,8 @@ const indicadores = {
   ],
   solicitacoes_apoio_abertas: 3,
   minhas_solicitacoes_pendentes: null,
+  pareceres_concluidos: 6,
+  solicitacoes_apoio_respondidas: 7,
 };
 
 function resposta(status: number, body: unknown): Response {

@@ -46,6 +46,8 @@ function respostaIndicadores(extra: Record<string, unknown> = {}): Response {
     grupos_cid: [],
     solicitacoes_apoio_abertas: 0,
     minhas_solicitacoes_pendentes: null,
+    pareceres_concluidos: 0,
+    solicitacoes_apoio_respondidas: 0,
     ...extra,
   });
 }

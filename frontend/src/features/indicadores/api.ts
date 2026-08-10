@@ -13,6 +13,8 @@ export type Indicadores = {
   grupos_cid: GrupoCidIndicador[];
   solicitacoes_apoio_abertas: number;
   minhas_solicitacoes_pendentes: number | null;
+  pareceres_concluidos: number;
+  solicitacoes_apoio_respondidas: number;
 };
 
 export function consultarIndicadores(signal?: AbortSignal): Promise<Indicadores> {

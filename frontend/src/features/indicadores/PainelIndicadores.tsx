@@ -122,6 +122,13 @@ export function PainelIndicadores({
           detalhe="Aguardando conclusão · em todo o sistema"
         />
         <CartaoIndicador
+          tom="verde"
+          icone="✔"
+          valor={String(indicadores.pareceres_concluidos)}
+          rotulo="Pareceres concluídos"
+          detalhe="Finalizados · em todo o sistema"
+        />
+        <CartaoIndicador
           tom="roxo"
           icone="✎"
           valor={String(indicadores.pericias_com_atestado_60_dias)}
@@ -134,6 +141,13 @@ export function PainelIndicadores({
           valor={String(indicadores.solicitacoes_apoio_abertas)}
           rotulo="Solicitações de apoio abertas"
           detalhe="Aguardando resposta · em todo o sistema"
+        />
+        <CartaoIndicador
+          tom="azul"
+          icone="↺"
+          valor={String(indicadores.solicitacoes_apoio_respondidas)}
+          rotulo="Solicitações de apoio respondidas"
+          detalhe="Concluídas · em todo o sistema"
         />
         {indicadores.minhas_solicitacoes_pendentes !== null ? (
           <button

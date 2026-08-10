@@ -31,6 +31,8 @@ class IndicadoresSaida(Schema):
     grupos_cid: list[GrupoCidIndicador]
     solicitacoes_apoio_abertas: int
     minhas_solicitacoes_pendentes: int | None
+    pareceres_concluidos: int
+    solicitacoes_apoio_respondidas: int
 
 
 def _tem_permissao(request, codename: str) -> bool:
@@ -99,4 +101,8 @@ def consultar_indicadores(request):
             estado=SolicitacaoApoio.Estado.ABERTA
         ).count(),
         minhas_solicitacoes_pendentes=minhas_solicitacoes_pendentes,
+        pareceres_concluidos=pareceres.filter(estado=Parecer.Estado.CONCLUIDO).count(),
+        solicitacoes_apoio_respondidas=solicitacoes.filter(
+            estado=SolicitacaoApoio.Estado.RESPONDIDA
+        ).count(),
     )

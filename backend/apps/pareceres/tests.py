@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group
 from django.db import connection
 from django.test import Client, TestCase
 
-from apps.apoio.services import criar_solicitacao
+from apps.apoio.services import criar_solicitacao, responder_solicitacao
 from apps.contas.models import Unidade
 from apps.legado.models import Pericia, ProtocoloCid, Servidor
 from apps.pareceres.models import EventoParecer
@@ -345,6 +345,45 @@ class ApiDeIndicadoresTests(TestCase):
         self.assertEqual(dados["pericias_com_atestado_60_dias"], 1)
         codigos = {grupo["codigo"] for grupo in dados["grupos_cid"]}
         self.assertEqual(codigos, {"M54.5", "Z00.0"})
+        self.assertEqual(dados["pareceres_concluidos"], 0)
+        self.assertEqual(dados["solicitacoes_apoio_respondidas"], 0)
+
+    def test_conta_pareceres_concluidos_e_solicitacoes_respondidas_separado_das_abertas(
+        self,
+    ) -> None:
+        criar_parecer(
+            ator=self.medico,
+            servidor_sismed_id=1001,
+            protocolo_sismed_id=None,
+            texto="Apto para retorno.",
+            conclusao="apto",
+            prioritario=False,
+            data_reavaliacao=None,
+            concluir=True,
+        )
+        solicitacao = criar_solicitacao(
+            ator=self.medico,
+            servidor_sismed_id=1001,
+            protocolo_sismed_id=None,
+            especialidade="seguranca_trabalho",
+            texto_solicitacao="Avaliar posto de trabalho.",
+        )
+        seguranca = get_user_model().objects.create_user(
+            username="seguranca.respondente",
+            password="Senha-ficticia-123",
+            unidade=self.medico.unidade,
+        )
+        seguranca.groups.add(Group.objects.get(name="Segurança do Trabalho"))
+        responder_solicitacao(
+            ator=seguranca, solicitacao=solicitacao, texto_resposta="Posto avaliado."
+        )
+
+        dados = self.cliente_gestor.get("/api/v1/indicadores").json()
+
+        self.assertEqual(dados["pareceres_concluidos"], 1)
+        self.assertEqual(dados["pareceres_em_rascunho"], 1)
+        self.assertEqual(dados["solicitacoes_apoio_respondidas"], 1)
+        self.assertEqual(dados["solicitacoes_apoio_abertas"], 0)
 
     def test_usuario_de_outra_unidade_ve_pareceres_de_todas_as_unidades(self) -> None:
         """
