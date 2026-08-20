@@ -8,19 +8,28 @@ pipeline {
     stages {
         stage('Backend') {
             agent {
-                docker { image 'python:3.12-slim' }
+                docker {
+                    image 'python:3.12-slim'
+                }
             }
+
             environment {
                 DATABASE_ENGINE = 'sqlite'
             }
+
             steps {
                 checkout scm
+
                 dir('backend') {
                     sh '''
-                        pip install --no-cache-dir -r requirements-dev.txt
-                        ruff format --check .
-                        ruff check .
-                        python manage.py test
+                        python -m venv .venv
+
+                        .venv/bin/python -m pip install --upgrade pip
+                        .venv/bin/python -m pip install --no-cache-dir -r requirements-dev.txt
+
+                        .venv/bin/ruff format --check .
+                        .venv/bin/ruff check .
+                        .venv/bin/python manage.py test
                     '''
                 }
             }
@@ -28,10 +37,14 @@ pipeline {
 
         stage('Frontend') {
             agent {
-                docker { image 'node:22-alpine' }
+                docker {
+                    image 'node:22-alpine'
+                }
             }
+
             steps {
                 checkout scm
+
                 dir('frontend') {
                     sh '''
                         npm ci
