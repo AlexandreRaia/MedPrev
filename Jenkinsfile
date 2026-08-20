@@ -15,6 +15,7 @@ pipeline {
 
             environment {
                 DATABASE_ENGINE = 'sqlite'
+                DJANGO_SECRET_KEY = 'chave-de-teste-ci-nao-usar-em-producao'
             }
 
             steps {
